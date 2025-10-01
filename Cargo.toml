@@ -1,0 +1,34 @@
+[package]
+name = "PostPyro"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance PostgreSQL driver for Python using PyO3 and tokio-postgres"
+authors = ["Magi sharma J  <sharmamagi0@gmail.com>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/magi8101/PostPyro"
+repository = "https://github.com/magi8101/PostPyro"
+keywords = ["postgresql", "database", "python", "pyo3", "async"]
+categories = ["database", "api-bindings"]
+
+[lib]
+name = "pypg_driver"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"] }
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+postgres-types = { version = "0.2", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+deadpool-postgres = { version = "0.10", features = ["rt_tokio_1"] }
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+once_cell = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true

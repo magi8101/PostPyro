@@ -1,0 +1,117 @@
+# Rust
+target/
+Cargo.lock
+*.pdb
+*.dll
+*.so
+*.dylib
+*.rlib
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyO3 / maturin
+*.pyd
+.maturin/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Temporary files
+*.tmp
+*.log
+.tmp/
+
+# OS generated files
+desktop.ini
+.DS_Store?
+ehthumbs.db
+Icon?
+
+# Development and testing files
+*_test.py
+test_*.py
+tests/
+demo.py
+kinsta_cloud_test.py
+async_demo.py
+
+# PyPI credentials (security)
+.pypirc
+
+# Build artifacts
+wheels/
+*.whl

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "PostPyro"
+version = "0.1.0"
+description = "High-performance PostgreSQL driver for Python using PyO3 and tokio-postgres"
+readme = "README.md"
+license = {text = "MIT OR Apache-2.0"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Magi Sharma J", email = "sharmamagi0@gmail.com"},
+]
+maintainers = [
+    {name = "Magi Sharma J", email = "sharmamagi0@gmail.com"},
+]
+keywords = ["postgresql", "database", "driver", "sync", "performance"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/magi8101/PostPyro"
+Documentation = "https://github.com/magi8101/PostPyro#readme"
+Repository = "https://github.com/magi8101/PostPyro.git"
+Issues = "https://github.com/magi8101/PostPyro/issues"
+Changelog = "https://github.com/magi8101/PostPyro/blob/main/CHANGELOG.md"
+
+[tool.maturin]
+python-source = "python"
+features = ["pyo3/extension-module"]
