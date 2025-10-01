@@ -1,6 +1,6 @@
 [package]
 name = "PostPyro"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "High-performance PostgreSQL driver for Python using PyO3 and tokio-postgres"
 authors = ["Magi sharma J  <sharmamagi0@gmail.com>"]
