@@ -11,7 +11,7 @@ This package provides a complete PostgreSQL database driver with:
 - Transaction management
 
 Basic usage:
-    import pypg_driver as pg
+    import PostPyro as pg
 
     conn = pg.connect("postgresql://user:pass@localhost/dbname")
     rows = conn.query("SELECT * FROM users")

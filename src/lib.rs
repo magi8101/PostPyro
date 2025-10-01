@@ -22,7 +22,7 @@ use transaction::Transaction;
 /// ## Basic Usage
 ///
 /// ```python
-/// import pypg_driver as pg
+/// import PostPyro as pg
 ///
 /// # Connect to database
 /// conn = pg.connect("postgresql://user:pass@localhost/dbname")
@@ -101,7 +101,7 @@ fn pypg_driver(_py: Python, m: &PyModule) -> PyResult<()> {
 ///     InterfaceError: If connection fails
 ///
 /// Example:
-///     >>> conn = pypg_driver.connect("postgresql://user:pass@localhost/dbname")
+///     >>> conn = PostPyro.connect("postgresql://user:pass@localhost/dbname")
 #[pyfunction]
 fn connect(connection_string: &str) -> PyResult<PgConnection> {
     PgConnection::new(connection_string)
@@ -113,7 +113,7 @@ fn connect(connection_string: &str) -> PyResult<PgConnection> {
 ///     str: Version string
 ///
 /// Example:
-///     >>> version = pypg_driver.get_version()
+///     >>> version = PostPyro.get_version()
 ///     >>> print(version)
 ///     '0.1.0'
 #[pyfunction]

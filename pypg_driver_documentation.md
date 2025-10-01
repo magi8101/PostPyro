@@ -24,7 +24,7 @@ pip install pypg-driver
 ## 🚀 Quick Start
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 # Connect to PostgreSQL  
 conn = pg.Connection("postgresql://user:password@localhost:5432/database")
@@ -49,10 +49,10 @@ conn.close()
 ### Module Constants
 
 ```python
-pypg_driver.__version__      # Driver version (e.g., "0.1.0")
-pypg_driver.apilevel         # "2.0" (DB-API 2.0 compliant)
-pypg_driver.threadsafety     # 2 (Thread-safe connections)
-pypg_driver.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
+PostPyro.__version__      # Driver version (e.g., "0.1.0")
+PostPyro.apilevel         # "2.0" (DB-API 2.0 compliant)
+PostPyro.threadsafety     # 2 (Thread-safe connections)
+PostPyro.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
 ```
 
 ### Functions
@@ -62,7 +62,7 @@ pypg_driver.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
 Create a new database connection.
 
 ```python
-conn = pypg_driver.connect("postgresql://user:pass@host:port/database")
+conn = PostPyro.connect("postgresql://user:pass@host:port/database")
 
 # Connection string formats supported:
 # - postgresql://user:password@host:port/database
@@ -75,7 +75,7 @@ conn = pypg_driver.connect("postgresql://user:pass@host:port/database")
 Get the driver version.
 
 ```python
-version = pypg_driver.get_version()  # Returns "0.1.0"
+version = PostPyro.get_version()  # Returns "0.1.0"
 ```
 
 ## 🔌 Connection Class
@@ -87,7 +87,7 @@ version = pypg_driver.get_version()  # Returns "0.1.0"
 Create a new connection directly.
 
 ```python
-conn = pypg_driver.Connection("postgresql://user:pass@localhost/db")
+conn = PostPyro.Connection("postgresql://user:pass@localhost/db")
 ```
 
 ### Methods
@@ -346,7 +346,7 @@ DatabaseError                    # Base database error
 ### Error Handling Examples
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 try:
     conn = pg.Connection("postgresql://user:pass@localhost/db")
@@ -423,7 +423,7 @@ assert isinstance(row['json_col'], dict)
 
 ```python
 import pandas as pd
-import pypg_driver as pg
+import PostPyro as pg
 
 conn = pg.Connection("postgresql://user:pass@localhost/db")
 
@@ -440,7 +440,7 @@ print(df.head())
 ### SQLAlchemy Style Usage
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 class DatabaseManager:
     def __init__(self, connection_string):
@@ -469,7 +469,7 @@ with DatabaseManager("postgresql://user:pass@localhost/db") as db:
 
 ```python
 from fastapi import FastAPI, HTTPException
-import pypg_driver as pg
+import PostPyro as pg
 
 app = FastAPI()
 
@@ -502,7 +502,7 @@ async def create_user(name: str, email: str):
 ### Django-Style Models
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 class Model:
     def __init__(self, connection_string):
@@ -563,7 +563,7 @@ class User(Model):
 
 ```python
 import time
-import pypg_driver as pg
+import PostPyro as pg
 
 conn = pg.Connection("postgresql://user:pass@localhost/db")
 
@@ -586,7 +586,7 @@ print(f"Rate: {10000/elapsed:.0f} inserts/second")
 ### Connection Pooling Pattern
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 from threading import Lock
 from queue import Queue, Empty
 
@@ -661,7 +661,7 @@ def bulk_insert_users(conn, users_data):
 
 ```python
 import time
-import pypg_driver as pg
+import PostPyro as pg
 
 def robust_query(connection_string, sql, params=None, max_retries=3):
     """Execute query with automatic retry on connection errors"""
@@ -805,7 +805,7 @@ rows = cur.fetchall()
 conn.close()
 
 # pypg-driver
-import pypg_driver as pg
+import PostPyro as pg
 conn = pg.Connection("postgresql://postgres@localhost/test")
 rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
 conn.close()
@@ -821,7 +821,7 @@ rows = await conn.fetch("SELECT * FROM users WHERE id = $1", 123)
 await conn.close()
 
 # pypg-driver (sync, but faster due to Rust)
-import pypg_driver as pg
+import PostPyro as pg
 conn = pg.Connection("postgresql://postgres@localhost/test")  
 rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
 conn.close()
@@ -904,7 +904,7 @@ pip install pypg-driver
 ## 🚀 Quick Start
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 # Connect to PostgreSQL  
 conn = pg.Connection("postgresql://user:password@localhost:5432/database")
@@ -929,10 +929,10 @@ conn.close()
 ### Module Constants
 
 ```python
-pypg_driver.__version__      # Driver version (e.g., "0.1.0")
-pypg_driver.apilevel         # "2.0" (DB-API 2.0 compliant)
-pypg_driver.threadsafety     # 2 (Thread-safe connections)
-pypg_driver.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
+PostPyro.__version__      # Driver version (e.g., "0.1.0")
+PostPyro.apilevel         # "2.0" (DB-API 2.0 compliant)
+PostPyro.threadsafety     # 2 (Thread-safe connections)
+PostPyro.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
 ```
 
 ### Functions
@@ -942,7 +942,7 @@ pypg_driver.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
 Create a new database connection.
 
 ```python
-conn = pypg_driver.connect("postgresql://user:pass@host:port/database")
+conn = PostPyro.connect("postgresql://user:pass@host:port/database")
 
 # Connection string formats supported:
 # - postgresql://user:password@host:port/database
@@ -955,7 +955,7 @@ conn = pypg_driver.connect("postgresql://user:pass@host:port/database")
 Get the driver version.
 
 ```python
-version = pypg_driver.get_version()  # Returns "0.1.0"
+version = PostPyro.get_version()  # Returns "0.1.0"
 ```
 
 ## 🔌 Connection Class
@@ -967,7 +967,7 @@ version = pypg_driver.get_version()  # Returns "0.1.0"
 Create a new connection directly.
 
 ```python
-conn = pypg_driver.Connection("postgresql://user:pass@localhost/db")
+conn = PostPyro.Connection("postgresql://user:pass@localhost/db")
 ```
 
 ### Methods
@@ -1226,7 +1226,7 @@ DatabaseError                    # Base database error
 ### Error Handling Examples
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 try:
     conn = pg.Connection("postgresql://user:pass@localhost/db")
@@ -1303,7 +1303,7 @@ assert isinstance(row['json_col'], dict)
 
 ```python
 import pandas as pd
-import pypg_driver as pg
+import PostPyro as pg
 
 conn = pg.Connection("postgresql://user:pass@localhost/db")
 
@@ -1320,7 +1320,7 @@ print(df.head())
 ### SQLAlchemy Style Usage
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 class DatabaseManager:
     def __init__(self, connection_string):
@@ -1349,7 +1349,7 @@ with DatabaseManager("postgresql://user:pass@localhost/db") as db:
 
 ```python
 from fastapi import FastAPI, HTTPException
-import pypg_driver as pg
+import PostPyro as pg
 
 app = FastAPI()
 
@@ -1382,7 +1382,7 @@ async def create_user(name: str, email: str):
 ### Django-Style Models
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 class Model:
     def __init__(self, connection_string):
@@ -1443,7 +1443,7 @@ class User(Model):
 
 ```python
 import time
-import pypg_driver as pg
+import PostPyro as pg
 
 conn = pg.Connection("postgresql://user:pass@localhost/db")
 
@@ -1466,7 +1466,7 @@ print(f"Rate: {10000/elapsed:.0f} inserts/second")
 ### Connection Pooling Pattern
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 from threading import Lock
 from queue import Queue, Empty
 
@@ -1541,7 +1541,7 @@ def bulk_insert_users(conn, users_data):
 
 ```python
 import time
-import pypg_driver as pg
+import PostPyro as pg
 
 def robust_query(connection_string, sql, params=None, max_retries=3):
     """Execute query with automatic retry on connection errors"""
@@ -1685,7 +1685,7 @@ rows = cur.fetchall()
 conn.close()
 
 # pypg-driver
-import pypg_driver as pg
+import PostPyro as pg
 conn = pg.Connection("postgresql://postgres@localhost/test")
 rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
 conn.close()
@@ -1701,7 +1701,7 @@ rows = await conn.fetch("SELECT * FROM users WHERE id = $1", 123)
 await conn.close()
 
 # pypg-driver (sync, but faster due to Rust)
-import pypg_driver as pg
+import PostPyro as pg
 conn = pg.Connection("postgresql://postgres@localhost/test")  
 rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
 conn.close()
@@ -1754,3 +1754,4 @@ pip install pypg-driver
 **Built with ❤️ using Rust, PyO3, and tokio-postgres**
 
 For more examples and advanced usage, visit our [GitHub repository](https://github.com/user/pypg-driver).
+

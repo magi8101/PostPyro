@@ -42,7 +42,7 @@ pip install -e .
 ## Quick Start
 
 ```python
-import pypg_driver as pg
+import PostPyro as pg
 
 # Connect to database
 conn = pg.connect("postgresql://user:password@localhost:5432/mydb")
