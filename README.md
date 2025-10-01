@@ -34,7 +34,7 @@ Prerequisites:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/yourusername/pypg-driver.git
+git clone https://github.com/magi8101/pypg-driver.git
 cd pypg-driver
 pip install -e .
 ```
@@ -321,7 +321,7 @@ pypg-driver is designed for high performance:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/yourusername/pypg-driver.git
+git clone https://github.com/magi8101/pypg-driver.git
 cd pypg-driver
 pip install -e .
 ```
