@@ -4,14 +4,14 @@ use pyo3::PyErr;
 use tokio_postgres::Error as PgError;
 
 // Base Database Error - follows DB-API 2.0 specification (PEP 249)
-create_exception!(pypg_driver, DatabaseError, PyException);
-create_exception!(pypg_driver, InterfaceError, DatabaseError);
-create_exception!(pypg_driver, DataError, DatabaseError);
-create_exception!(pypg_driver, OperationalError, DatabaseError);
-create_exception!(pypg_driver, IntegrityError, DatabaseError);
-create_exception!(pypg_driver, InternalError, DatabaseError);
-create_exception!(pypg_driver, ProgrammingError, DatabaseError);
-create_exception!(pypg_driver, NotSupportedError, DatabaseError);
+create_exception!(PostPyro, DatabaseError, PyException);
+create_exception!(PostPyro, InterfaceError, DatabaseError);
+create_exception!(PostPyro, DataError, DatabaseError);
+create_exception!(PostPyro, OperationalError, DatabaseError);
+create_exception!(PostPyro, IntegrityError, DatabaseError);
+create_exception!(PostPyro, InternalError, DatabaseError);
+create_exception!(PostPyro, ProgrammingError, DatabaseError);
+create_exception!(PostPyro, NotSupportedError, DatabaseError);
 
 /// Map PostgreSQL errors to appropriate Python DB-API 2.0 exceptions
 pub fn map_db_error(error: PgError) -> PyErr {

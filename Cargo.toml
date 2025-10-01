@@ -1,6 +1,6 @@
 [package]
 name = "PostPyro"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "High-performance PostgreSQL driver for Python using PyO3 and tokio-postgres"
 authors = ["Magi sharma J  <sharmamagi0@gmail.com>"]
@@ -12,7 +12,7 @@ keywords = ["postgresql", "database", "python", "pyo3", "async"]
 categories = ["database", "api-bindings"]
 
 [lib]
-name = "pypg_driver"
+name = "PostPyro"
 crate-type = ["cdylib"]
 
 [dependencies]

@@ -55,7 +55,7 @@ use transaction::Transaction;
 /// - Transaction management with savepoints
 /// - Support for all PostgreSQL data types
 #[pymodule]
-fn pypg_driver(_py: Python, m: &PyModule) -> PyResult<()> {
+fn PostPyro(_py: Python, m: &PyModule) -> PyResult<()> {
     // Add version information
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 

@@ -18,7 +18,7 @@ Basic usage:
     conn.close()
 """
 
-from .pypg_driver import (
+from .PostPyro import (
     # Classes
     Connection,
     Row,
