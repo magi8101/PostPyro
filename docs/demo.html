@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostPyro Documentation Demo</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #0f0f23;
+            color: white;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .hero {
+            text-align: center;
+            padding: 60px 0;
+        }
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ff6b35, #ff8c42);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p {
+            font-size: 1.25rem;
+            color: #8892b0;
+            margin-bottom: 2rem;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #ff6b35, #ff8c42);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: transform 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+        .feature {
+            background: #1a1a2e;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #233554;
+        }
+        .feature h3 {
+            color: #ff6b35;
+            margin-bottom: 1rem;
+        }
+        .feature p {
+            color: #8892b0;
+        }
+        .code-preview {
+            background: #1e1e3f;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 1px solid #233554;
+            overflow-x: auto;
+        }
+        .code-preview code {
+            color: #64ffda;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: #8892b0;
+            border-top: 1px solid #233554;
+            margin-top: 4rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>🔥 PostPyro Docs</h1>
+            <p>Interactive documentation for the high-performance PostgreSQL driver</p>
+            <a href="index.html" class="btn">View Documentation</a>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <h3>📚 Complete API Reference</h3>
+                <p>Comprehensive documentation for all PostPyro classes, methods, and functions with examples.</p>
+            </div>
+            <div class="feature">
+                <h3>🚀 Quick Start Guide</h3>
+                <p>Get up and running with PostPyro in minutes with our interactive tutorials and code examples.</p>
+            </div>
+            <div class="feature">
+                <h3>💡 Real-world Examples</h3>
+                <p>Learn how to integrate PostPyro with popular frameworks like FastAPI, pandas, and more.</p>
+            </div>
+            <div class="feature">
+                <h3>⚡ Performance Insights</h3>
+                <p>Discover why PostPyro outperforms other PostgreSQL drivers and how to optimize your usage.</p>
+            </div>
+        </div>
+
+        <div class="code-preview">
+            <code>
+# Quick example of PostPyro in action<br>
+import PostPyro as pg<br><br>
+
+# Connect and query<br>
+conn = pg.Connection("postgresql://user:pass@localhost/db")<br>
+users = conn.query("SELECT * FROM users WHERE active = $1", [True])<br><br>
+
+# Use transactions<br>
+with conn.begin() as tx:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tx.execute("INSERT INTO logs (event) VALUES ($1)", ["user_login"])<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tx.execute("UPDATE users SET last_seen = NOW() WHERE id = $1", [user_id])
+            </code>
+        </div>
+
+        <div style="text-align: center; margin: 3rem 0;">
+            <h2>Features Covered in Documentation</h2>
+            <ul style="text-align: left; display: inline-block; color: #8892b0;">
+                <li>Installation and setup</li>
+                <li>Connection management</li>
+                <li>Query execution and result handling</li>
+                <li>Transaction management</li>
+                <li>Error handling and debugging</li>
+                <li>Type system and conversions</li>
+                <li>Performance optimization</li>
+                <li>Integration patterns</li>
+                <li>Migration from other drivers</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>Built with ❤️ for the PostPyro community | <a href="https://github.com/magi8101/PostPyro" style="color: #ff6b35;">View on GitHub</a></p>
+        </div>
+    </div>
+</body>
+</html>
