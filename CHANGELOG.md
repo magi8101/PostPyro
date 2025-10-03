@@ -1,13 +1,36 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to PostPyro will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.0.0] - 2025-10-03
+
+### 🎉 First Production Release!
+
+### Added
+
+- **Production-ready PostgreSQL driver** built with Rust + PyO3 + tokio-postgres
+- **Complete parameter system** supporting all PostgreSQL types:
+  - Strings, integers, floats, booleans
+  - Automatic type conversion with binary protocol
+  - Proper NULL handling and type casting
+- **Full DB-API 2.0 compliance** with threadsafety level 2
+- **Transaction support** with automatic commit/rollback
+- **Error handling** with detailed PostgreSQL error mapping
+- **Performance optimizations**:
+  - LRU statement caching for prepared statements
+  - Binary protocol communication
+  - Zero-copy operations where possible
+
+### Performance
+
+- **Fastest simple queries** compared to industry standards
+- Competitive parameterized query performance
+- Thread-safe multi-connection support
 
 ## [0.1.0] - 2024-10-01
 
 ### Added
+
 - Initial release of pypg-driver
 - High-performance PostgreSQL driver built with Rust and PyO3
 - Synchronous API with async I/O under the hood using tokio-postgres
@@ -38,12 +61,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-built wheels for easy installation
 
 ### Performance
+
 - Native Rust performance with zero-copy operations
 - Tokio async I/O for excellent network performance
 - Optimized binary protocol parsing
 - Efficient type conversions between PostgreSQL and Python
 
 ### Documentation
+
 - Complete API reference
 - Usage examples and best practices
 - Integration guides for popular libraries (Pandas, FastAPI, etc.)

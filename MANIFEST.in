@@ -1,46 +1,39 @@
-# Exclude build artifacts and development files
-target/
-.git/
-.gitignore
-*.pyc
-__pycache__/
-.pytest_cache/
-.coverage
-htmlcov/
-*.egg-info/
-build/
-dist/
-.env
-.venv
-venv/
-env/
+#Exclude build artifacts and development files
+target /
+            .git /
+            .gitignore
+                *.pyc
+                    __pycache__ /
+            .pytest_cache /
+            .coverage
+                htmlcov /
+        *.egg -
+    info /
+        build /
+        dist /
+            .env
+            .venv
+                venv /
+        env /
 
-# Exclude test files from distribution
-*_test.py
-test_*.py
-tests/
-kinsta_cloud_test.py
-async_demo.py
+#Exclude test files from distribution
+        *_test.py test_ *.py
+             tests /
+        kinsta_cloud_test.py
+            async_demo.py
 
-# Exclude development documentation
-*.md
-!README.md
-!CHANGELOG.md
+#Exclude development documentation
+                *.md !README.md !CHANGELOG.md
 
-# Exclude configuration files
-.github/
-.vscode/
-.idea/
-*.code-workspace
+#Exclude configuration files
+            .github /
+            .vscode /
+            .idea /
+        *.code -
+    workspace
 
-# Exclude temporary files
-*.tmp
-*.log
-*.swp
-*.swo
-*~
+#Exclude temporary files
+        *.tmp *.log *.swp *.swo * ~
 
-# Exclude OS files
-.DS_Store
-Thumbs.db
-desktop.ini
+#Exclude OS files
+                                      .DS_Store Thumbs.db desktop.ini

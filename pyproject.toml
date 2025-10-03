@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "PostPyro"
-version = "0.1.2"
-description = "High-performance PostgreSQL driver for Python using PyO3 and tokio-postgres"
+version = "1.0.0"
+description = "Ultra-fast PostgreSQL driver for Python built with Rust - Binary protocol, prepared statements, thread-safe"
 readme = "README.md"
 license = {text = "MIT OR Apache-2.0"}
 requires-python = ">=3.8"
@@ -15,9 +15,9 @@ authors = [
 maintainers = [
     {name = "Magi Sharma J", email = "sharmamagi0@gmail.com"},
 ]
-keywords = ["postgresql", "database", "driver", "sync", "performance"]
+keywords = ["postgresql", "database", "driver", "rust", "performance", "binary-protocol", "prepared-statements", "thread-safe"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "License :: OSI Approved :: Apache Software License",

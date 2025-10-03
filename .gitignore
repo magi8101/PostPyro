@@ -1,6 +1,5 @@
 # Rust
 target/
-Cargo.lock
 *.pdb
 *.dll
 *.so
@@ -48,6 +47,18 @@ venv.bak/
 .vscode/
 .idea/
 *.swp
+
+# Test files and demos
+*test*.py
+*demo*.py
+*benchmark*.py
+*example*.py
+*debug*.py
+*.md.backup
+Cargo_*.toml
+
+# Documentation builds
+docs/_build/
 *.swo
 *~
 .DS_Store
@@ -115,3 +126,8 @@ async_demo.py
 # Build artifacts
 wheels/
 *.whl
+
+#md documentation
+ADVANCED_PARAMETER_SYSTEM.md
+BOOLEAN_PARAMETER_ERROR_ANALYSIS.md
+PostPyro_documentation.md

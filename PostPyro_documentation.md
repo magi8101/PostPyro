@@ -7,7 +7,7 @@ PostPyro is a modern, blazingly fast PostgreSQL driver for Python that combines 
 ## 🚀 Key Features
 
 - **🔥 High Performance**: Rust-powered backend with zero-copy data handling
-- **🛡️ Memory Safe**: Rust's ownership system prevents memory leaks and segfaults  
+- **🛡️ Memory Safe**: Rust's ownership system prevents memory leaks and segfaults
 - **🌐 Full PostgreSQL Support**: All data types, arrays, JSON, UUIDs, network types
 - **⚡ Tokio Async I/O**: Native async I/O under the hood for excellent performance
 - **🔒 Type Safety**: Comprehensive type checking and conversion
@@ -26,7 +26,7 @@ pip install PostPyro
 ```python
 import PostPyro as pg
 
-# Connect to PostgreSQL  
+# Connect to PostgreSQL
 conn = pg.Connection("postgresql://user:password@localhost:5432/database")
 
 # Simple query
@@ -36,7 +36,7 @@ for user in users:
 
 # Insert data
 user_id = conn.execute(
-    "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id", 
+    "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id",
     ["John Doe", "john@example.com"]
 )
 
@@ -66,7 +66,7 @@ conn = PostPyro.connect("postgresql://user:pass@host:port/database")
 
 # Connection string formats supported:
 # - postgresql://user:password@host:port/database
-# - postgres://user:password@host:port/database  
+# - postgres://user:password@host:port/database
 # - With SSL: postgresql://user:pass@host/db?sslmode=require
 ```
 
@@ -124,13 +124,13 @@ Execute INSERT, UPDATE, DELETE, or DDL statements. Returns the number of affecte
 ```python
 # Insert
 affected = conn.execute(
-    "INSERT INTO users (name, email) VALUES ($1, $2)", 
+    "INSERT INTO users (name, email) VALUES ($1, $2)",
     ["Alice", "alice@example.com"]
 )
 
-# Update  
+# Update
 affected = conn.execute(
-    "UPDATE users SET email = $1 WHERE id = $2", 
+    "UPDATE users SET email = $1 WHERE id = $2",
     ["newemail@example.com", 123]
 )
 
@@ -334,7 +334,7 @@ PostPyro provides comprehensive PostgreSQL error mapping with specific exception
 
 ```python
 DatabaseError                    # Base database error
-├── InterfaceError              # Driver interface problems  
+├── InterfaceError              # Driver interface problems
 ├── DataError                   # Data processing errors
 ├── OperationalError            # Database operation errors
 ├── IntegrityError              # Constraint violations
@@ -351,16 +351,16 @@ import PostPyro as pg
 try:
     conn = pg.Connection("postgresql://user:pass@localhost/db")
     conn.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
-    
+
 except pg.IntegrityError as e:
     print(f"Constraint violation: {e}")
-    
+
 except pg.OperationalError as e:
     print(f"Database operation failed: {e}")
-    
+
 except pg.ProgrammingError as e:
     print(f"SQL error: {e}")
-    
+
 except pg.DatabaseError as e:
     print(f"General database error: {e}")
 ```
@@ -371,22 +371,22 @@ PostPyro automatically converts between Python and PostgreSQL types.
 
 ### Supported Type Conversions
 
-| PostgreSQL Type | Python Type | Example |
-|----------------|-------------|---------|
-| `BOOLEAN` | `bool` | `True`, `False` |
-| `SMALLINT`, `INTEGER` | `int` | `42`, `-123` |
-| `BIGINT` | `int` | `9223372036854775807` |
-| `REAL`, `DOUBLE PRECISION` | `float` | `3.14`, `2.718` |
-| `TEXT`, `VARCHAR` | `str` | `"Hello World"` |
-| `BYTEA` | `bytes` | `b"binary data"` |
-| `DATE` | `datetime.date` | `date(2023, 12, 25)` |
-| `TIME` | `datetime.time` | `time(14, 30, 0)` |
-| `TIMESTAMP` | `datetime.datetime` | `datetime(2023, 12, 25, 14, 30)` |
-| `TIMESTAMPTZ` | `datetime.datetime` | With timezone info |
-| `UUID` | `uuid.UUID` | `UUID('550e8400-e29b-41d4-a716-446655440000')` |
-| `JSON`, `JSONB` | `dict`, `list` | `{"key": "value"}`, `[1, 2, 3]` |
-| `ARRAY` | `list` | `[1, 2, 3]`, `["a", "b", "c"]` |
-| `INET`, `CIDR` | `str` | `"192.168.1.1"`, `"192.168.0.0/24"` |
+| PostgreSQL Type            | Python Type         | Example                                        |
+| -------------------------- | ------------------- | ---------------------------------------------- |
+| `BOOLEAN`                  | `bool`              | `True`, `False`                                |
+| `SMALLINT`, `INTEGER`      | `int`               | `42`, `-123`                                   |
+| `BIGINT`                   | `int`               | `9223372036854775807`                          |
+| `REAL`, `DOUBLE PRECISION` | `float`             | `3.14`, `2.718`                                |
+| `TEXT`, `VARCHAR`          | `str`               | `"Hello World"`                                |
+| `BYTEA`                    | `bytes`             | `b"binary data"`                               |
+| `DATE`                     | `datetime.date`     | `date(2023, 12, 25)`                           |
+| `TIME`                     | `datetime.time`     | `time(14, 30, 0)`                              |
+| `TIMESTAMP`                | `datetime.datetime` | `datetime(2023, 12, 25, 14, 30)`               |
+| `TIMESTAMPTZ`              | `datetime.datetime` | With timezone info                             |
+| `UUID`                     | `uuid.UUID`         | `UUID('550e8400-e29b-41d4-a716-446655440000')` |
+| `JSON`, `JSONB`            | `dict`, `list`      | `{"key": "value"}`, `[1, 2, 3]`                |
+| `ARRAY`                    | `list`              | `[1, 2, 3]`, `["a", "b", "c"]`                 |
+| `INET`, `CIDR`             | `str`               | `"192.168.1.1"`, `"192.168.0.0/24"`            |
 
 ### Type Usage Examples
 
@@ -397,12 +397,12 @@ import uuid
 # Insert various types
 conn.execute("""
     INSERT INTO mixed_types (
-        bool_col, int_col, float_col, text_col, 
+        bool_col, int_col, float_col, text_col,
         date_col, timestamp_col, uuid_col, json_col
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 """, [
     True,                                    # boolean
-    42,                                      # integer  
+    42,                                      # integer
     3.14159,                                 # float
     "Hello PostgreSQL",                      # text
     date(2023, 12, 25),                     # date
@@ -445,16 +445,16 @@ import PostPyro as pg
 class DatabaseManager:
     def __init__(self, connection_string):
         self.conn = pg.Connection(connection_string)
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.conn.close()
-    
+
     def fetch_users(self, active_only=True):
         return self.conn.query(
-            "SELECT * FROM users WHERE active = $1", 
+            "SELECT * FROM users WHERE active = $1",
             [active_only]
         )
 
@@ -480,7 +480,7 @@ conn = pg.Connection("postgresql://user:pass@localhost/db")
 async def get_user(user_id: int):
     try:
         user = conn.query_one(
-            "SELECT id, name, email FROM users WHERE id = $1", 
+            "SELECT id, name, email FROM users WHERE id = $1",
             [user_id]
         )
         return user.to_dict()
@@ -507,11 +507,11 @@ import PostPyro as pg
 class Model:
     def __init__(self, connection_string):
         self.conn = pg.Connection(connection_string)
-    
+
     def save(self):
         # Implement save logic
         pass
-    
+
     @classmethod
     def find(cls, **kwargs):
         # Implement find logic
@@ -522,17 +522,17 @@ class User(Model):
         super().__init__(connection_string)
         self.name = name
         self.email = email
-    
+
     def save(self):
         return self.conn.execute(
             "INSERT INTO users (name, email) VALUES ($1, $2)",
             [self.name, self.email]
         )
-    
+
     @classmethod
     def find_by_email(cls, conn, email):
         row = conn.query_one(
-            "SELECT * FROM users WHERE email = $1", 
+            "SELECT * FROM users WHERE email = $1",
             [email]
         )
         return cls(None, row['name'], row['email'])
@@ -544,20 +544,20 @@ class User(Model):
 
 1. **🦀 Rust Backend**: Native performance without Python interpreter overhead
 2. **⚡ Zero-Copy**: Direct memory mapping between PostgreSQL and Python
-3. **🌊 Async I/O**: Tokio-powered async networking under the hood  
+3. **🌊 Async I/O**: Tokio-powered async networking under the hood
 4. **🎯 Optimized Parsing**: Fast binary protocol parsing in Rust
 5. **📦 No Dependencies**: No external Python dependencies to slow things down
 
 ### Comparison with Other Drivers
 
-| Feature | PostPyro | psycopg2 | asyncpg | psycopg3 |
-|---------|----------|----------|---------|----------|
-| Language | Rust + Python | C + Python | Cython | C + Python |
-| Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Memory Safety | ✅ Rust | ❌ Manual C | ⚠️ Cython | ❌ Manual C |
-| Installation | 📦 Wheel | 🔧 Compilation | 📦 Wheel | 🔧 Compilation |
-| Dependencies | 🎯 Zero | 📦 Many | 📦 Few | 📦 Many |
-| API Simplicity | ✅ Simple | ⚠️ Complex | ⚠️ Async Only | ⚠️ Complex |
+| Feature        | PostPyro      | psycopg2       | asyncpg       | psycopg3       |
+| -------------- | ------------- | -------------- | ------------- | -------------- |
+| Language       | Rust + Python | C + Python     | Cython        | C + Python     |
+| Performance    | ⭐⭐⭐⭐⭐    | ⭐⭐⭐         | ⭐⭐⭐⭐      | ⭐⭐⭐         |
+| Memory Safety  | ✅ Rust       | ❌ Manual C    | ⚠️ Cython     | ❌ Manual C    |
+| Installation   | 📦 Wheel      | 🔧 Compilation | 📦 Wheel      | 🔧 Compilation |
+| Dependencies   | 🎯 Zero       | 📦 Many        | 📦 Few        | 📦 Many        |
+| API Simplicity | ✅ Simple     | ⚠️ Complex     | ⚠️ Async Only | ⚠️ Complex     |
 
 ### Performance Example
 
@@ -595,22 +595,22 @@ class ConnectionPool:
         self.connection_string = connection_string
         self.pool = Queue(maxsize=pool_size)
         self.lock = Lock()
-        
+
         # Initialize pool
         for _ in range(pool_size):
             conn = pg.Connection(connection_string)
             self.pool.put(conn)
-    
+
     def get_connection(self):
         try:
             return self.pool.get(timeout=10)
         except Empty:
             raise RuntimeError("No connections available")
-    
+
     def return_connection(self, conn):
         if not conn.is_closed():
             self.pool.put(conn)
-    
+
     def close_all(self):
         while not self.pool.empty():
             try:
@@ -637,7 +637,7 @@ def process_user(user_id):
 ```python
 def bulk_insert_users(conn, users_data):
     """Efficiently insert many users using batch operations"""
-    
+
     # Method 1: Single transaction with multiple inserts
     with conn.begin() as tx:
         for user_data in users_data:
@@ -645,7 +645,7 @@ def bulk_insert_users(conn, users_data):
                 "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
                 [user_data['name'], user_data['email'], user_data['age']]
             )
-    
+
     # Method 2: Batch execution (faster for large datasets)
     queries = []
     for user_data in users_data:
@@ -653,7 +653,7 @@ def bulk_insert_users(conn, users_data):
             f"INSERT INTO users (name, email, age) VALUES "
             f"('{user_data['name']}', '{user_data['email']}', {user_data['age']})"
         )
-    
+
     conn.execute_batch(queries)
 ```
 
@@ -665,26 +665,26 @@ import PostPyro as pg
 
 def robust_query(connection_string, sql, params=None, max_retries=3):
     """Execute query with automatic retry on connection errors"""
-    
+
     for attempt in range(max_retries):
         try:
             conn = pg.Connection(connection_string)
-            
+
             if not conn.ping():
                 raise pg.OperationalError("Connection failed ping test")
-            
+
             result = conn.query(sql, params)
             conn.close()
             return result
-            
+
         except (pg.OperationalError, pg.InterfaceError) as e:
             if attempt == max_retries - 1:
                 raise
-            
+
             print(f"Connection error (attempt {attempt + 1}): {e}")
             time.sleep(2 ** attempt)  # Exponential backoff
             continue
-        
+
         except pg.DatabaseError:
             # Don't retry on SQL errors
             raise
@@ -767,7 +767,7 @@ except Exception as e:
 
 1. **Use batch operations** for multiple inserts/updates
 2. **Prepare statements** for repeated queries
-3. **Use transactions** to group related operations  
+3. **Use transactions** to group related operations
 4. **Close connections** explicitly to free resources
 5. **Use connection pooling** in multi-threaded applications
 6. **Leverage Row.to_dict()** for pandas integration
@@ -822,7 +822,7 @@ await conn.close()
 
 # PostPyro (sync, but faster due to Rust)
 import PostPyro as pg
-conn = pg.Connection("postgresql://postgres@localhost/test")  
+conn = pg.Connection("postgresql://postgres@localhost/test")
 rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
 conn.close()
 ```
@@ -832,6 +832,7 @@ conn.close()
 ### Common Issues
 
 **Connection refused**
+
 ```python
 # Check if PostgreSQL is running
 if not conn.ping():
@@ -839,6 +840,7 @@ if not conn.ping():
 ```
 
 **Authentication failed**
+
 ```python
 try:
     conn = pg.Connection("postgresql://user:wrongpass@localhost/db")
@@ -847,6 +849,7 @@ except pg.OperationalError as e:
 ```
 
 **Type conversion errors**
+
 ```python
 # Use proper Python types
 conn.execute("INSERT INTO users (age) VALUES ($1)", [25])  # ✅ int
@@ -859,7 +862,7 @@ PostPyro provides the perfect balance of **performance**, **safety**, and **simp
 
 - **🚀 Faster than psycopg2** thanks to Rust implementation
 - **🛡️ Safer than C-based drivers** with Rust's memory safety
-- **🎯 Simpler than asyncpg** with synchronous interface  
+- **🎯 Simpler than asyncpg** with synchronous interface
 - **📦 Easier to install** with pre-built wheels
 - **🌊 More efficient** with zero-copy operations
 

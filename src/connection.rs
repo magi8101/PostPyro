@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_postgres::{Client, NoTls, Statement};
@@ -10,13 +11,14 @@ use crate::runtime::RuntimeManager;
 use crate::types::py_objects_to_postgres_values;
 use crate::row::Row;
 
-/// PostgreSQL database connection
+/// High-performance PostgreSQL database connection with optimized caching
 #[pyclass(name = "Connection")]
 pub struct PgConnection {
     client: Arc<Mutex<Client>>,
     runtime: RuntimeManager,
     is_closed: Arc<Mutex<bool>>,
-    prepared_statements: Arc<Mutex<HashMap<String, Statement>>>,
+    // LRU cache for prepared statements
+    prepared_statements: Arc<Mutex<LruCache<String, Statement>>>,
 }
 
 #[pymethods]
@@ -36,7 +38,7 @@ impl PgConnection {
     pub fn new(connection_string: &str) -> PyResult<Self> {
         let runtime = RuntimeManager::new();
 
-        // Parse connection string (basic validation)
+        // Parse connection string
         if !connection_string.starts_with("postgresql://") && !connection_string.starts_with("postgres://") {
             return Err(invalid_connection_string_error("Must start with 'postgresql://' or 'postgres://'"));
         }
@@ -50,15 +52,15 @@ impl PgConnection {
 
         let client = Arc::new(Mutex::new(client));
         let is_closed = Arc::new(Mutex::new(false));
-        let prepared_statements = Arc::new(Mutex::new(HashMap::new()));
+        let prepared_statements = Arc::new(Mutex::new(
+            LruCache::new(NonZeroUsize::new(500).unwrap())
+        ));
 
         // Spawn connection handler as background task
-        let _client_clone = Arc::clone(&client);
         let is_closed_clone = Arc::clone(&is_closed);
         runtime.spawn(async move {
             if let Err(e) = connection.await {
                 eprintln!("Connection error: {}", e);
-                // Mark connection as closed on error
                 if let Ok(mut closed) = is_closed_clone.try_lock() {
                     *closed = true;
                 }
@@ -74,6 +76,7 @@ impl PgConnection {
     }
 
     /// Execute a query that doesn't return rows (INSERT, UPDATE, DELETE)
+    /// Automatically uses prepared statements for better performance
     ///
     /// Args:
     ///     query: SQL query string
@@ -96,21 +99,35 @@ impl PgConnection {
             Vec::new()
         };
 
-        let client: Arc<Mutex<Client>> = Arc::clone(&self.client);
+        let client = Arc::clone(&self.client);
+        let prepared_statements = Arc::clone(&self.prepared_statements);
+        let query_string = query.to_string();
+
         self.runtime.block_on(async move {
             let client = client.lock().await;
             let params_refs: Vec<&(dyn postgres_types::ToSql + Sync)> = postgres_params
                 .iter()
-                .map(|p| p as &(dyn postgres_types::ToSql + Sync))
+                .map(|p| p.as_ref() as &(dyn postgres_types::ToSql + Sync))
                 .collect();
 
-            client.execute(query, &params_refs[..])
+            // Try to get cached statement, or prepare and cache if not found
+            let mut stmts = prepared_statements.lock().await;
+            let stmt = if let Some(cached_stmt) = stmts.get(&query_string) {
+                cached_stmt
+            } else {
+                let new_stmt = client.prepare(&query_string).await.map_err(map_db_error)?;
+                stmts.put(query_string.clone(), new_stmt);
+                stmts.get(&query_string).unwrap()
+            };
+
+            client.execute(stmt, &params_refs[..])
                 .await
                 .map_err(map_db_error)
         })
     }
 
     /// Execute a query and return all rows
+    /// Automatically uses prepared statements for better performance
     ///
     /// Args:
     ///     query: SQL query string
@@ -133,27 +150,44 @@ impl PgConnection {
             Vec::new()
         };
 
-        let client: Arc<Mutex<Client>> = Arc::clone(&self.client);
+        let client = Arc::clone(&self.client);
+        let prepared_statements = Arc::clone(&self.prepared_statements);
+        let query_string = query.to_string();
+
         let rows = self.runtime.block_on(async move {
             let client = client.lock().await;
             let params_refs: Vec<&(dyn postgres_types::ToSql + Sync)> = postgres_params
                 .iter()
-                .map(|p| p as &(dyn postgres_types::ToSql + Sync))
+                .map(|p| p.as_ref() as &(dyn postgres_types::ToSql + Sync))
                 .collect();
 
-            client.query(query, &params_refs[..])
+            // Use cached prepared statement
+            let mut stmts = prepared_statements.lock().await;
+            let stmt = if let Some(cached_stmt) = stmts.get(&query_string) {
+                cached_stmt
+            } else {
+                let new_stmt = client.prepare(&query_string).await.map_err(map_db_error)?;
+                stmts.put(query_string.clone(), new_stmt);
+                stmts.get(&query_string).unwrap()
+            };
+
+            client.query(stmt, &params_refs[..])
                 .await
                 .map_err(map_db_error)
         })?;
 
-        // Convert to Python Row objects
-        let py_rows = PyList::empty(py);
-        for row in rows {
-            let py_row = Row::from_tokio_row(py, &row)?;
-            py_rows.append(py_row)?;
-        }
+        // Optimize for small vs large result sets
+        let py_rows = if rows.len() < 100 {
+            let mut result = Vec::with_capacity(rows.len());
+            for row in rows {
+                result.push(Row::from_tokio_row(py, &row)?);
+            }
+            result
+        } else {
+            Row::from_tokio_rows(py, &rows)?
+        };
 
-        Ok(py_rows.to_object(py))
+        Ok(py_rows.into_py(py))
     }
 
     /// Execute a query and return exactly one row
@@ -179,29 +213,44 @@ impl PgConnection {
             Vec::new()
         };
 
-        let client: Arc<Mutex<Client>> = Arc::clone(&self.client);
+        let client = Arc::clone(&self.client);
+        let prepared_statements = Arc::clone(&self.prepared_statements);
+        let query_string = query.to_string();
+
         let row = self.runtime.block_on(async move {
             let client = client.lock().await;
             let params_refs: Vec<&(dyn postgres_types::ToSql + Sync)> = postgres_params
                 .iter()
-                .map(|p| p as &(dyn postgres_types::ToSql + Sync))
+                .map(|p| p.as_ref() as &(dyn postgres_types::ToSql + Sync))
                 .collect();
 
-            client.query_one(query, &params_refs[..])
+            // Use cached prepared statement
+            let mut stmts = prepared_statements.lock().await;
+            let stmt = if let Some(cached_stmt) = stmts.get(&query_string) {
+                cached_stmt
+            } else {
+                let new_stmt = client.prepare(&query_string).await.map_err(map_db_error)?;
+                stmts.put(query_string.clone(), new_stmt);
+                stmts.get(&query_string).unwrap()
+            };
+
+            client.query_one(stmt, &params_refs[..])
                 .await
                 .map_err(map_db_error)
         })?;
 
-        Row::from_tokio_row(py, &row)
+        let row_obj = Row::from_tokio_row(py, &row)?;
+        Ok(Py::new(py, row_obj)?)
     }
 
-    /// Prepare a statement for repeated execution
+    /// Manually prepare a statement and cache it
+    /// (Usually not needed as execute/query auto-cache)
     ///
     /// Args:
     ///     query: SQL query string
     ///
     /// Returns:
-    ///     str: Statement name/handle
+    ///     str: Statement cache key (the query itself)
     ///
     /// Raises:
     ///     InterfaceError: If connection is closed
@@ -209,10 +258,8 @@ impl PgConnection {
     pub fn prepare(&self, query: &str) -> PyResult<String> {
         self.check_connection()?;
 
-        let client: Arc<Mutex<Client>> = Arc::clone(&self.client);
-        let prepared_statements: Arc<Mutex<HashMap<String, Statement>>> = Arc::clone(&self.prepared_statements);
-
-        // Use query as the key for simplicity
+        let client = Arc::clone(&self.client);
+        let prepared_statements = Arc::clone(&self.prepared_statements);
         let statement_name = query.to_string();
 
         self.runtime.block_on(async move {
@@ -220,10 +267,19 @@ impl PgConnection {
             let statement = client.prepare(query).await.map_err(map_db_error)?;
 
             let mut statements = prepared_statements.lock().await;
-            statements.insert(statement_name.clone(), statement);
+            statements.put(statement_name.clone(), statement);
 
             Ok(statement_name)
         })
+    }
+
+    /// Clear the prepared statement cache
+    pub fn clear_cache(&self) -> PyResult<()> {
+        let mut statements = self.prepared_statements.try_lock().map_err(|_| {
+            pyo3::exceptions::PyRuntimeError::new_err("Cannot access statement cache")
+        })?;
+        statements.clear();
+        Ok(())
     }
 
     /// Close the database connection
@@ -264,6 +320,12 @@ impl PgConnection {
         let info = pyo3::types::PyDict::new(py);
         info.set_item("closed", self.is_closed()?)?;
         info.set_item("healthy", self.ping(py)?)?;
+        
+        let cache_size = self.prepared_statements.try_lock()
+            .map(|cache| cache.len())
+            .unwrap_or(0);
+        info.set_item("cached_statements", cache_size)?;
+        
         Ok(info.to_object(py))
     }
 
@@ -277,23 +339,7 @@ impl PgConnection {
         })
     }
 
-    /// Begin a new transaction (placeholder - use manual BEGIN/COMMIT for now)
-    ///
-    /// Note: Due to lifetime constraints with tokio-postgres transactions,
-    /// use manual transaction management with BEGIN/COMMIT/ROLLBACK statements.
-    ///
-    /// Returns:
-    ///     None: Use manual SQL transaction commands
-    ///
-    /// Raises:
-    ///     NotSupportedError: Feature requires manual transaction management
-    pub fn begin(&self, _isolation_level: Option<&str>, _read_only: Option<bool>) -> PyResult<()> {
-        Err(crate::error::not_supported_error(
-            "Auto-managed transactions - use BEGIN/COMMIT SQL statements or connection context manager"
-        ))
-    }
-
-    /// Execute multiple statements in a transaction using manual SQL
+    /// Execute multiple statements in a transaction
     ///
     /// Args:
     ///     queries: List of SQL query strings
@@ -317,7 +363,6 @@ impl PgConnection {
             match self.execute(py, &query, None) {
                 Ok(result) => results.push(result.to_object(py)),
                 Err(e) => {
-                    // Rollback on error
                     let _ = self.execute(py, "ROLLBACK", None);
                     return Err(e);
                 }
