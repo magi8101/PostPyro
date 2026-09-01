@@ -31,8 +31,11 @@ fn _test_async_bridge(py: Python) -> PyResult<&PyAny> {
 
 #[pymodule]
 fn PostPyro(_py: Python, m: &PyModule) -> PyResult<()> {
-    pyo3_asyncio::tokio::init_with_runtime(RuntimeManager::shared())
-        .expect("pyo3-asyncio: failed to init shared Tokio runtime");
+    pyo3_asyncio::tokio::init_with_runtime(RuntimeManager::shared()).map_err(|_| {
+        pyo3::exceptions::PyRuntimeError::new_err(
+            "pyo3-asyncio: failed to init shared Tokio runtime (already initialized?)",
+        )
+    })?;
 
     m.add_class::<PgConnection>()?;
     m.add_class::<ConnectionPool>()?;
