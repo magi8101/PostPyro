@@ -1,7 +1,6 @@
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::PyErr;
-use tokio_postgres::Error as PgError;
 
 // Base Database Error - follows DB-API 2.0 specification (PEP 249)
 create_exception!(PostPyro, DatabaseError, PyException);
@@ -13,12 +12,6 @@ create_exception!(PostPyro, InternalError, DatabaseError);
 create_exception!(PostPyro, ProgrammingError, DatabaseError);
 create_exception!(PostPyro, NotSupportedError, DatabaseError);
 
-/// Map PostgreSQL errors to appropriate Python DB-API 2.0 exceptions
-pub fn map_db_error(error: PgError) -> PyErr {
-    map_db_error_enhanced(error)
-}
-
-/// Create a type conversion error for when Python types can't be converted to PostgreSQL types
 pub fn type_conversion_error(expected: &str, actual: &str) -> PyErr {
     DataError::new_err(format!(
         "Type conversion error: expected {}, got {}",
@@ -26,58 +19,15 @@ pub fn type_conversion_error(expected: &str, actual: &str) -> PyErr {
     ))
 }
 
-/// Create an error for invalid connection strings
 pub fn invalid_connection_string_error(details: &str) -> PyErr {
     InterfaceError::new_err(format!("Invalid connection string: {}", details))
 }
 
-/// Create an error for when a connection is closed but an operation is attempted
-pub fn connection_closed_error() -> PyErr {
-    InterfaceError::new_err("Connection is closed")
-}
-
-/// Create an error for when a transaction is completed but operations are attempted
 pub fn transaction_completed_error() -> PyErr {
     ProgrammingError::new_err("Transaction is already committed or rolled back")
 }
 
-/// Create an error for unsupported operations
-pub fn not_supported_error(feature: &str) -> PyErr {
-    NotSupportedError::new_err(format!("Feature not supported: {}", feature))
-}
-
-/// Map PostgreSQL error to appropriate Python exception
-pub fn map_db_error_enhanced(error: PgError) -> PyErr {
-    use std::time::Instant;
-    let start_time = Instant::now();
-
-    let (error_class, detailed_message) = analyze_postgresql_error(&error);
-    let processing_time = start_time.elapsed();
-
-    // Add performance metrics to error for debugging
-    let enhanced_message = if processing_time > std::time::Duration::from_micros(100) {
-        format!(
-            "{} [Error processing: {:?}]",
-            detailed_message, processing_time
-        )
-    } else {
-        detailed_message
-    };
-
-    match error_class {
-        PostgreSQLErrorClass::ConnectionIssue => OperationalError::new_err(enhanced_message),
-        PostgreSQLErrorClass::SyntaxError => ProgrammingError::new_err(enhanced_message),
-        PostgreSQLErrorClass::ConstraintViolation => IntegrityError::new_err(enhanced_message),
-        PostgreSQLErrorClass::DataTypeIssue => DataError::new_err(enhanced_message),
-        PostgreSQLErrorClass::InsufficientResources => OperationalError::new_err(enhanced_message),
-        PostgreSQLErrorClass::SystemError => InternalError::new_err(enhanced_message),
-        PostgreSQLErrorClass::UnsupportedFeature => NotSupportedError::new_err(enhanced_message),
-        PostgreSQLErrorClass::GenericDatabase => DatabaseError::new_err(enhanced_message),
-    }
-}
-
-/// PostgreSQL error classification
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PostgreSQLErrorClass {
     ConnectionIssue,
     SyntaxError,
@@ -89,167 +39,143 @@ enum PostgreSQLErrorClass {
     GenericDatabase,
 }
 
-/// Analyze PostgreSQL error using SQLSTATE codes
-#[inline]
-fn analyze_postgresql_error(error: &PgError) -> (PostgreSQLErrorClass, String) {
-    let base_message = error.to_string();
-
-    // Extract SQLSTATE code for precise error classification
-    let error_code = error.code();
-    let error_class = if let Some(code) = error_code {
-        match code.code() {
-            // Connection exceptions (08xxx)
-            code if code.starts_with("08") => PostgreSQLErrorClass::ConnectionIssue,
-
-            // Syntax error or access rule violation (42xxx)
-            code if code.starts_with("42") => PostgreSQLErrorClass::SyntaxError,
-
-            // Integrity constraint violation (23xxx)
-            code if code.starts_with("23") => PostgreSQLErrorClass::ConstraintViolation,
-
-            // Invalid data type (22xxx)
-            code if code.starts_with("22") => PostgreSQLErrorClass::DataTypeIssue,
-
-            // Insufficient resources (53xxx, 54xxx)
-            code if code.starts_with("53") || code.starts_with("54") => {
-                PostgreSQLErrorClass::InsufficientResources
-            }
-
-            // System error (58xxx, XX000)
-            code if code.starts_with("58") || code == "XX000" => PostgreSQLErrorClass::SystemError,
-
-            // Feature not supported (0Axxx)
-            code if code.starts_with("0A") => PostgreSQLErrorClass::UnsupportedFeature,
-
-            _ => PostgreSQLErrorClass::GenericDatabase,
+/// Classify a PostgreSQL SQLSTATE code into an error category. Pure
+/// function so it's unit-testable without a live connection or the GIL.
+fn classify_sqlstate(code: &str) -> PostgreSQLErrorClass {
+    match code {
+        c if c.starts_with("08") => PostgreSQLErrorClass::ConnectionIssue,
+        c if c.starts_with("42") => PostgreSQLErrorClass::SyntaxError,
+        c if c.starts_with("23") => PostgreSQLErrorClass::ConstraintViolation,
+        c if c.starts_with("22") => PostgreSQLErrorClass::DataTypeIssue,
+        c if c.starts_with("53") || c.starts_with("54") => {
+            PostgreSQLErrorClass::InsufficientResources
         }
-    } else {
-        PostgreSQLErrorClass::GenericDatabase
-    };
-
-    // Enhanced message with context
-    let detailed_message = if let Some(code) = error_code {
-        let severity = get_error_severity(&error_class);
-        let suggestion = get_error_suggestion(&error_class, code.code());
-        format!(
-            "[{}] {} (SQLSTATE: {}){}",
-            severity,
-            base_message,
-            code.code(),
-            if !suggestion.is_empty() {
-                format!("\nSuggestion: {}", suggestion)
-            } else {
-                String::new()
-            }
-        )
-    } else {
-        base_message
-    };
-
-    (error_class, detailed_message)
-}
-
-/// Get human-readable severity level
-fn get_error_severity(class: &PostgreSQLErrorClass) -> &'static str {
-    match class {
-        PostgreSQLErrorClass::SystemError | PostgreSQLErrorClass::InsufficientResources => {
-            "CRITICAL"
-        }
-        PostgreSQLErrorClass::ConnectionIssue => "ERROR",
-        PostgreSQLErrorClass::ConstraintViolation | PostgreSQLErrorClass::SyntaxError => "ERROR",
-        PostgreSQLErrorClass::DataTypeIssue => "WARNING",
-        PostgreSQLErrorClass::UnsupportedFeature => "INFO",
-        PostgreSQLErrorClass::GenericDatabase => "ERROR",
+        c if c.starts_with("58") || c == "XX000" => PostgreSQLErrorClass::SystemError,
+        c if c.starts_with("0A") => PostgreSQLErrorClass::UnsupportedFeature,
+        _ => PostgreSQLErrorClass::GenericDatabase,
     }
 }
 
-/// Provide contextual suggestions for error resolution
-fn get_error_suggestion(class: &PostgreSQLErrorClass, sqlstate: &str) -> String {
+fn suggestion_for(class: PostgreSQLErrorClass, sqlstate: &str) -> &'static str {
     match class {
         PostgreSQLErrorClass::ConnectionIssue => {
-            "Check network connectivity, server status, and connection parameters".to_string()
+            "Check network connectivity, server status, and connection parameters"
         }
         PostgreSQLErrorClass::SyntaxError => {
-            "Verify SQL syntax, table/column names, and parameter placeholders".to_string()
+            "Verify SQL syntax, table/column names, and parameter placeholders"
         }
         PostgreSQLErrorClass::ConstraintViolation => match sqlstate {
-            "23505" => "Duplicate key violation - ensure unique values".to_string(),
-            "23503" => "Foreign key constraint violation - check referenced values".to_string(),
-            "23502" => "NOT NULL constraint violation - provide required values".to_string(),
-            "23514" => "CHECK constraint violation - verify data meets constraints".to_string(),
-            _ => "Check data integrity constraints".to_string(),
+            "23505" => "Duplicate key violation - ensure unique values",
+            "23503" => "Foreign key constraint violation - check referenced values",
+            "23502" => "NOT NULL constraint violation - provide required values",
+            "23514" => "CHECK constraint violation - verify data meets constraints",
+            _ => "Check data integrity constraints",
         },
         PostgreSQLErrorClass::DataTypeIssue => {
-            "Verify data types and format - check parameter types and values".to_string()
+            "Verify data types and format - check parameter types and values"
         }
         PostgreSQLErrorClass::InsufficientResources => {
-            "Database server resources exhausted - contact administrator".to_string()
+            "Database server resources exhausted - contact administrator"
         }
         PostgreSQLErrorClass::SystemError => {
-            "Internal database error - check server logs and contact administrator".to_string()
+            "Internal database error - check server logs and contact administrator"
         }
-        PostgreSQLErrorClass::UnsupportedFeature => {
-            "Feature not available in this PostgreSQL version".to_string()
-        }
-        PostgreSQLErrorClass::GenericDatabase => {
-            "Check query and database configuration".to_string()
-        }
+        PostgreSQLErrorClass::UnsupportedFeature => "Feature not available in this PostgreSQL version",
+        PostgreSQLErrorClass::GenericDatabase => "Check query and database configuration",
     }
 }
 
-/// Original simple mapping function for backwards compatibility
-#[allow(dead_code)]
-fn map_db_error_simple(error: PgError) -> PyErr {
-    use tokio_postgres::error::SqlState;
-
-    // Try to get the SQL state code for more specific error mapping
-    if let Some(db_error) = error.as_db_error() {
-        match db_error.code() {
-            // Constraint violation errors
-            &SqlState::UNIQUE_VIOLATION
-            | &SqlState::FOREIGN_KEY_VIOLATION
-            | &SqlState::CHECK_VIOLATION
-            | &SqlState::NOT_NULL_VIOLATION => {
-                IntegrityError::new_err(format!("Constraint violation: {}", error))
-            }
-
-            // Syntax errors and invalid names
-            &SqlState::SYNTAX_ERROR
-            | &SqlState::UNDEFINED_COLUMN
-            | &SqlState::UNDEFINED_TABLE
-            | &SqlState::UNDEFINED_FUNCTION => {
-                ProgrammingError::new_err(format!("SQL error: {}", error))
-            }
-
-            // Data type errors
-            &SqlState::INVALID_TEXT_REPRESENTATION
-            | &SqlState::NUMERIC_VALUE_OUT_OF_RANGE
-            | &SqlState::DATETIME_FIELD_OVERFLOW => {
-                DataError::new_err(format!("Data conversion error: {}", error))
-            }
-
-            // Connection and operational errors
-            &SqlState::CONNECTION_EXCEPTION
-            | &SqlState::CONNECTION_DOES_NOT_EXIST
-            | &SqlState::CONNECTION_FAILURE => {
-                OperationalError::new_err(format!("Connection error: {}", error))
-            }
-
-            // Internal PostgreSQL errors
-            &SqlState::INTERNAL_ERROR | &SqlState::DATA_CORRUPTED => {
-                InternalError::new_err(format!("Internal database error: {}", error))
-            }
-
-            // Feature not supported
-            &SqlState::FEATURE_NOT_SUPPORTED => {
-                NotSupportedError::new_err(format!("Feature not supported: {}", error))
-            }
-
-            // Default to DatabaseError for unmapped codes
-            _ => DatabaseError::new_err(format!("Database error: {}", error)),
+fn map_database_error(db_err: &dyn sqlx::error::DatabaseError) -> PyErr {
+    let message = db_err.message();
+    let (class, enhanced) = match db_err.code() {
+        Some(code) => {
+            let class = classify_sqlstate(&code);
+            let suggestion = suggestion_for(class, &code);
+            (
+                class,
+                format!("{} (SQLSTATE: {})\nSuggestion: {}", message, code, suggestion),
+            )
         }
-    } else {
-        // Non-database errors (connection issues, etc.)
-        OperationalError::new_err(format!("Operational error: {}", error))
+        None => (PostgreSQLErrorClass::GenericDatabase, message.to_string()),
+    };
+
+    match class {
+        PostgreSQLErrorClass::ConnectionIssue | PostgreSQLErrorClass::InsufficientResources => {
+            OperationalError::new_err(enhanced)
+        }
+        PostgreSQLErrorClass::SyntaxError => ProgrammingError::new_err(enhanced),
+        PostgreSQLErrorClass::ConstraintViolation => IntegrityError::new_err(enhanced),
+        PostgreSQLErrorClass::DataTypeIssue => DataError::new_err(enhanced),
+        PostgreSQLErrorClass::SystemError => InternalError::new_err(enhanced),
+        PostgreSQLErrorClass::UnsupportedFeature => NotSupportedError::new_err(enhanced),
+        PostgreSQLErrorClass::GenericDatabase => DatabaseError::new_err(enhanced),
+    }
+}
+
+/// Map a sqlx error to the DB-API 2.0 exception hierarchy.
+pub fn map_db_error(error: sqlx::Error) -> PyErr {
+    match error {
+        sqlx::Error::Database(db_err) => map_database_error(db_err.as_ref()),
+        sqlx::Error::RowNotFound => {
+            ProgrammingError::new_err("Query returned no rows, expected exactly one")
+        }
+        sqlx::Error::PoolTimedOut => {
+            OperationalError::new_err("Timed out waiting for a connection from the pool")
+        }
+        sqlx::Error::PoolClosed => OperationalError::new_err("Connection pool is closed"),
+        sqlx::Error::WorkerCrashed => InternalError::new_err("Database worker task crashed"),
+        sqlx::Error::Io(e) => OperationalError::new_err(format!("I/O error: {}", e)),
+        sqlx::Error::Tls(e) => OperationalError::new_err(format!("TLS error: {}", e)),
+        sqlx::Error::Protocol(msg) => InternalError::new_err(format!("Protocol error: {}", msg)),
+        sqlx::Error::Configuration(e) => {
+            InterfaceError::new_err(format!("Invalid configuration: {}", e))
+        }
+        sqlx::Error::ColumnNotFound(name) => {
+            ProgrammingError::new_err(format!("Column '{}' not found", name))
+        }
+        sqlx::Error::ColumnIndexOutOfBounds { index, len } => ProgrammingError::new_err(format!(
+            "Column index {} out of bounds (row has {} columns)",
+            index, len
+        )),
+        sqlx::Error::ColumnDecode { index, source } => {
+            DataError::new_err(format!("Failed to decode column {}: {}", index, source))
+        }
+        sqlx::Error::Decode(e) => DataError::new_err(format!("Decode error: {}", e)),
+        sqlx::Error::Encode(e) => DataError::new_err(format!("Encode error: {}", e)),
+        sqlx::Error::TypeNotFound { type_name } => {
+            NotSupportedError::new_err(format!("Type '{}' not found", type_name))
+        }
+        other => DatabaseError::new_err(format!("Database error: {}", other)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifies_connection_sqlstate() {
+        assert_eq!(classify_sqlstate("08006"), PostgreSQLErrorClass::ConnectionIssue);
+    }
+
+    #[test]
+    fn classifies_unique_violation_sqlstate() {
+        assert_eq!(classify_sqlstate("23505"), PostgreSQLErrorClass::ConstraintViolation);
+    }
+
+    #[test]
+    fn classifies_syntax_error_sqlstate() {
+        assert_eq!(classify_sqlstate("42601"), PostgreSQLErrorClass::SyntaxError);
+    }
+
+    #[test]
+    fn classifies_unknown_sqlstate_as_generic() {
+        assert_eq!(classify_sqlstate("99999"), PostgreSQLErrorClass::GenericDatabase);
+    }
+
+    #[test]
+    fn classifies_insufficient_resources() {
+        assert_eq!(classify_sqlstate("53200"), PostgreSQLErrorClass::InsufficientResources);
+        assert_eq!(classify_sqlstate("54000"), PostgreSQLErrorClass::InsufficientResources);
     }
 }
