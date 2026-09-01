@@ -1,196 +1,97 @@
-use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use tokio_postgres::{NoTls, Config};
-use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+use sqlx::postgres::{PgPool, PgPoolOptions};
 
 use crate::error::map_db_error;
 use crate::row::Row;
-use crate::runtime::RuntimeManager;
-use crate::types::py_objects_to_postgres_values;
+use crate::types::{bind_params, pg_value_to_py as _pg_value_to_py};
 
-/// High-performance connection pool for managing database connections
-#[pyclass(name = "ConnectionPool")]
-pub struct ConnectionPool {
-    pool: Arc<Pool>,
-    runtime: RuntimeManager,
+/// An async PostgreSQL connection pool. Construct via the module-level
+/// `connect()` factory - there is no synchronous constructor, since
+/// establishing the first connection is itself async.
+#[pyclass]
+pub struct Pool {
+    pool: PgPool,
 }
 
 #[pymethods]
-impl ConnectionPool {
-    /// Create a new connection pool
-    ///
-    /// Args:
-    ///     connection_string: PostgreSQL connection string
-    ///     max_size: Maximum number of connections in pool (default: 10)
-    ///     min_size: Minimum number of connections in pool (default: 0)
-    ///
-    /// Returns:
-    ///     ConnectionPool: New connection pool
-    ///
-    /// Raises:
-    ///     InterfaceError: If pool creation fails
-    #[new]
-    #[pyo3(signature = (connection_string, max_size=10, min_size=0))]
-    pub fn new(connection_string: &str, max_size: usize, min_size: usize) -> PyResult<Self> {
-        let runtime = RuntimeManager::new();
-
-        // Parse connection string
-        let config: Config = connection_string.parse().map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Invalid connection string: {}", e))
-        })?;
-
-        // Create pool
-        let mgr_config = ManagerConfig {
-            recycling_method: RecyclingMethod::Fast,
-        };
-        let mgr = Manager::from_config(config, NoTls, mgr_config);
-        
-        let pool = runtime.block_on(async {
-            Pool::builder(mgr)
-                .max_size(max_size)
-                .build()
-                .map_err(|e| {
-                    pyo3::exceptions::PyConnectionError::new_err(format!("Pool creation error: {}", e))
-                })
-        })?;
-
-        Ok(Self {
-            pool: Arc::new(pool),
-            runtime,
+impl Pool {
+    #[pyo3(signature = (query, params=None))]
+    fn execute<'p>(&self, py: Python<'p>, query: String, params: Option<Vec<PyObject>>) -> PyResult<&'p PyAny> {
+        let pool = self.pool.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let q = Python::with_gil(|py| {
+                bind_params(sqlx::query(sqlx::AssertSqlSafe(query)), py, &params.unwrap_or_default())
+            })?;
+            let result = q.execute(&pool).await.map_err(map_db_error)?;
+            Ok(result.rows_affected())
         })
     }
 
-    /// Execute a query that doesn't return rows
-    ///
-    /// Args:
-    ///     query: SQL query string
-    ///     params: Query parameters (optional)
-    ///
-    /// Returns:
-    ///     int: Number of rows affected
-    pub fn execute(&self, py: Python, query: &str, params: Option<&PyList>) -> PyResult<u64> {
-        let postgres_params = if let Some(p) = params {
-            let params_vec: Vec<PyObject> = p.iter().map(|item| item.into()).collect();
-            py_objects_to_postgres_values(py, &params_vec)?
-        } else {
-            Vec::new()
-        };
-
-        let pool = Arc::clone(&self.pool);
-        let query = query.to_string();
-
-        self.runtime.block_on(async move {
-            let client = pool.get().await.map_err(|e| {
-                pyo3::exceptions::PyConnectionError::new_err(format!("Failed to get connection: {}", e))
+    #[pyo3(signature = (query, params=None))]
+    fn query<'p>(&self, py: Python<'p>, query: String, params: Option<Vec<PyObject>>) -> PyResult<&'p PyAny> {
+        let pool = self.pool.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let q = Python::with_gil(|py| {
+                bind_params(sqlx::query(sqlx::AssertSqlSafe(query)), py, &params.unwrap_or_default())
             })?;
-
-            let params_refs: Vec<&(dyn postgres_types::ToSql + Sync)> = postgres_params
-                .iter()
-                .map(|p| p.as_ref() as &(dyn postgres_types::ToSql + Sync))
-                .collect();
-
-            client.execute(&query, &params_refs[..])
-                .await
-                .map_err(map_db_error)
+            let rows = q.fetch_all(&pool).await.map_err(map_db_error)?;
+            Python::with_gil(|py| {
+                let py_rows: PyResult<Vec<Py<Row>>> = rows
+                    .iter()
+                    .map(|r| Py::new(py, Row::from_pg_row(py, r)?))
+                    .collect();
+                Ok(PyList::new(py, py_rows?).to_object(py))
+            })
         })
     }
 
-    /// Execute a query and return all rows
-    ///
-    /// Args:
-    ///     query: SQL query string
-    ///     params: Query parameters (optional)
-    ///
-    /// Returns:
-    ///     list: List of Row objects
-    pub fn query(&self, py: Python, query: &str, params: Option<&PyList>) -> PyResult<PyObject> {
-        let postgres_params = if let Some(p) = params {
-            let params_vec: Vec<PyObject> = p.iter().map(|item| item.into()).collect();
-            py_objects_to_postgres_values(py, &params_vec)?
-        } else {
-            Vec::new()
-        };
-
-        let pool = Arc::clone(&self.pool);
-        let query = query.to_string();
-
-        let rows = self.runtime.block_on(async move {
-            let client = pool.get().await.map_err(|e| {
-                pyo3::exceptions::PyConnectionError::new_err(format!("Failed to get connection: {}", e))
+    #[pyo3(signature = (query, params=None))]
+    fn query_one<'p>(&self, py: Python<'p>, query: String, params: Option<Vec<PyObject>>) -> PyResult<&'p PyAny> {
+        let pool = self.pool.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let q = Python::with_gil(|py| {
+                bind_params(sqlx::query(sqlx::AssertSqlSafe(query)), py, &params.unwrap_or_default())
             })?;
-
-            let params_refs: Vec<&(dyn postgres_types::ToSql + Sync)> = postgres_params
-                .iter()
-                .map(|p| p.as_ref() as &(dyn postgres_types::ToSql + Sync))
-                .collect();
-
-            client.query(&query, &params_refs[..])
-                .await
-                .map_err(map_db_error)
-        })?;
-
-        let py_rows = if rows.len() < 100 {
-            let mut result = Vec::with_capacity(rows.len());
-            for row in rows {
-                result.push(Row::from_tokio_row(py, &row)?);
-            }
-            result
-        } else {
-            Row::from_tokio_rows(py, &rows)?
-        };
-
-        Ok(py_rows.into_py(py))
+            let row = q.fetch_one(&pool).await.map_err(map_db_error)?;
+            Python::with_gil(|py| Row::from_pg_row(py, &row))
+        })
     }
 
-    /// Execute a query and return exactly one row
-    ///
-    /// Args:
-    ///     query: SQL query string
-    ///     params: Query parameters (optional)
-    ///
-    /// Returns:
-    ///     Row: Single row result
-    pub fn query_one(&self, py: Python, query: &str, params: Option<&PyList>) -> PyResult<Py<Row>> {
-        let postgres_params = if let Some(p) = params {
-            let params_vec: Vec<PyObject> = p.iter().map(|item| item.into()).collect();
-            py_objects_to_postgres_values(py, &params_vec)?
-        } else {
-            Vec::new()
-        };
-
-        let pool = Arc::clone(&self.pool);
-        let query = query.to_string();
-
-        let row = self.runtime.block_on(async move {
-            let client = pool.get().await.map_err(|e| {
-                pyo3::exceptions::PyConnectionError::new_err(format!("Failed to get connection: {}", e))
-            })?;
-
-            let params_refs: Vec<&(dyn postgres_types::ToSql + Sync)> = postgres_params
-                .iter()
-                .map(|p| p.as_ref() as &(dyn postgres_types::ToSql + Sync))
-                .collect();
-
-            client.query_one(&query, &params_refs[..])
-                .await
-                .map_err(map_db_error)
-        })?;
-
-        let row_obj = Row::from_tokio_row(py, &row)?;
-        Ok(Py::new(py, row_obj)?)
+    fn close<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let pool = self.pool.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            pool.close().await;
+            Ok(())
+        })
     }
 
-    /// Get pool status information
-    ///
-    /// Returns:
-    ///     dict: Dictionary with pool statistics
-    pub fn status(&self, py: Python) -> PyResult<PyObject> {
-        let status = self.pool.status();
-        let info = pyo3::types::PyDict::new(py);
-        info.set_item("size", status.size)?;
-        info.set_item("available", status.available)?;
-        info.set_item("max_size", status.max_size)?;
-        Ok(info.to_object(py))
+    fn is_closed(&self) -> bool {
+        self.pool.is_closed()
     }
+}
+
+impl Pool {
+    pub(crate) fn from_pg_pool(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub(crate) fn inner(&self) -> &PgPool {
+        &self.pool
+    }
+}
+
+/// Create a new connection pool. This is the only way to obtain a `Pool`.
+#[pyfunction]
+#[pyo3(signature = (dsn, max_size=10, min_size=0))]
+pub fn connect(py: Python, dsn: String, max_size: u32, min_size: u32) -> PyResult<&PyAny> {
+    pyo3_asyncio::tokio::future_into_py(py, async move {
+        let pool = PgPoolOptions::new()
+            .max_connections(max_size)
+            .min_connections(min_size)
+            .connect(&dsn)
+            .await
+            .map_err(map_db_error)?;
+        Ok(Pool::from_pg_pool(pool))
+    })
 }
