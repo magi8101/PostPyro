@@ -75,31 +75,31 @@ pub fn bind_params<'q>(
     py: Python,
     params: &[PyObject],
 ) -> PyResult<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>> {
-    let mut query = query.persistent(false);
+    let mut has_null = false;
+    let mut query = query;
     for obj in params {
         let obj_ref = obj.as_ref(py);
-        query = if obj.is_none(py) {
-            query.bind(UnspecifiedNull)
+        if obj.is_none(py) {
+            has_null = true;
+            query = query.bind(UnspecifiedNull);
         } else if let Ok(b) = obj_ref.downcast::<PyBool>() {
-            query.bind(b.extract::<bool>()?)
+            query = query.bind(b.extract::<bool>()?)
         } else if let Ok(i) = obj_ref.downcast::<PyInt>() {
-            query.bind(i.extract::<i64>()?)
+            query = query.bind(i.extract::<i64>()?)
         } else if let Ok(f) = obj_ref.downcast::<PyFloat>() {
-            query.bind(f.extract::<f64>()?)
+            query = query.bind(f.extract::<f64>()?)
         } else if let Ok(s) = obj_ref.downcast::<PyString>() {
-            query.bind(s.extract::<String>()?)
+            query = query.bind(s.extract::<String>()?)
         } else {
             let s = obj_ref.str()?.extract::<String>()?;
-            query.bind(s)
+            query = query.bind(s)
         };
     }
-    Ok(query)
+    Ok(query.persistent(!has_null))
 }
 
-/// Decode one non-NULL-typed-generically column: `T` covers both the
-/// Postgres wire decode (`Decode`/`Type`) and the Python conversion
-/// (`IntoPy`), which pyo3's `chrono` feature gives us for free for the
-/// chrono types alongside the primitive numeric/string/bool types.
+/// Decode one column of a type that has both sqlx's wire decode (`Decode`/`Type`)
+/// and pyo3's Python conversion (`IntoPy`). Handles NULLs by returning Python's `None`.
 fn decode_scalar<'r, T>(py: Python, row: &'r PgRow, idx: usize) -> PyResult<PyObject>
 where
     T: sqlx::Decode<'r, Postgres> + sqlx::Type<Postgres> + IntoPy<PyObject>,
