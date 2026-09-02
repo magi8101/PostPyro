@@ -9,6 +9,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Diagnostic only - the abort panic under panic="abort" doesn't unwind,
+      # but a backtrace still gets printed before the process aborts.
+      RUST_BACKTRACE: full
 
     services:
       postgres:
