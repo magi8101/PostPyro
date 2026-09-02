@@ -62,6 +62,16 @@ impl Pool {
         let pool = self.pool.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             pool.close().await;
+            // pool.close() waits for connections checked out through the
+            // normal path, but a Transaction abandoned without commit()/
+            // rollback()/`async with` returns its connection via a detached
+            // background task spawned from Rust's Drop (see
+            // Transaction::drop) - nothing awaits that task's completion.
+            // A short grace period here gives it a scheduling window to
+            // actually finish before the caller (often the whole process)
+            // proceeds, rather than racing runtime/process teardown against
+            // still-in-flight cleanup work.
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             Ok(())
         })
     }
