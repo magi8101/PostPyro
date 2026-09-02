@@ -197,6 +197,16 @@ user_dict = row.to_dict()
 
 Obtained via `await pool.transaction()`. Represents a database transaction with automatic commit/rollback when used as an `async with` block.
 
+**Use `async with tx:`, not just `await pool.transaction()` left dangling.** If a
+transaction is neither committed/rolled back explicitly nor used as an `async
+with` block, cleanup falls back to dropping the underlying connection - which
+only happens once nothing in Python still references the `Transaction` object.
+Code that catches an exception and holds onto it (`asyncio.gather(...,
+return_exceptions=True)` is the common case) keeps that reference, and the
+checked-out connection plus any row locks it holds, alive for as long as the
+exception is - under concurrent load this can exhaust the pool. `async with
+tx:` rolls back immediately on exception and doesn't have this dependency.
+
 ### Methods
 
 #### `await tx.execute(sql: str, params: List = None) -> int`

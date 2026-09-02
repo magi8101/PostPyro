@@ -46,7 +46,18 @@ class Row:
         ...
 
 class Transaction:
-    """A running transaction from `pool.transaction()`; use as `async with tx:` or call `commit`/`rollback` explicitly."""
+    """A running transaction from `pool.transaction()`; use as `async with tx:` or call `commit`/`rollback` explicitly.
+
+    If neither happens (an exception unwinds past a `Transaction` without going
+    through `async with` or an explicit `commit`/`rollback`), cleanup falls back
+    to dropping the underlying connection, which only runs once nothing in
+    Python still references this object. A caught exception held by
+    `asyncio.gather(..., return_exceptions=True)` (or anything else retaining
+    the traceback) keeps that reference - and the checked-out connection, and
+    any row locks it holds - alive for as long as the exception is. Under
+    concurrent load this can exhaust the pool. Prefer `async with tx:`, which
+    rolls back immediately and doesn't have this dependency.
+    """
 
     async def execute(self, query: str, params: Optional[List[Any]] = None) -> int:
         """Runs a statement within this transaction and returns rows affected; raises `ProgrammingError` if already committed/rolled back."""
