@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PostPyro - High-Performance PostgreSQL Driver for Python</title>
+    <title>PostPyro - Async PostgreSQL Driver for Python</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,7 +52,7 @@
                         <span class="gradient-text">PostPyro</span>
                     </h1>
                     <p class="hero-subtitle">
-                        High-Performance PostgreSQL Driver for Python Built with Rust
+                        Async PostgreSQL Driver for Python, Built with Rust
                     </p>
                     <p class="hero-description">
                         PostPyro combines the safety and performance of Rust with the simplicity of Python.
@@ -141,14 +141,14 @@ asyncio.run(main())</code></pre>
                         <div class="feature-icon">🔥</div>
                         <h3 class="feature-title">High Performance</h3>
                         <p class="feature-description">
-                            Rust-powered backend with zero-copy data handling for maximum speed and efficiency.
+                            Rust-powered backend with zero-copy data handling.
                         </p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🛡️</div>
                         <h3 class="feature-title">Memory Safe</h3>
                         <p class="feature-description">
-                            Rust's ownership system prevents memory leaks and segfaults, ensuring reliability.
+                            Rust's ownership system prevents memory leaks and segfaults.
                         </p>
                     </div>
                     <div class="feature-card">
@@ -169,9 +169,11 @@ asyncio.run(main())</code></pre>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🔒</div>
-                        <h3 class="feature-title">Type Safety</h3>
+                        <h3 class="feature-title">Type Conversion</h3>
                         <p class="feature-description">
-                            Comprehensive type checking and automatic conversion between Python and PostgreSQL types.
+                            Postgres values decode to native Python types automatically. Bound parameters other than
+                            <code>bool</code>/<code>int</code>/<code>float</code>/<code>str</code>/<code>None</code> need
+                            an explicit <code>::type</code> cast in the SQL text - see the Type System reference below.
                         </p>
                     </div>
                     <div class="feature-card">
@@ -688,7 +690,7 @@ print(tx.is_active())  # False</code></pre>
 
                         <div class="api-section" id="api-errors">
                             <h3 class="api-section-title">Error Handling</h3>
-                            <p class="section-description">PostPyro provides comprehensive PostgreSQL error mapping with specific exception types.</p>
+                            <p class="section-description">PostPyro maps <code>sqlx</code>/Postgres errors onto a DB-API 2.0-flavored exception hierarchy, so you can catch by class instead of parsing SQLSTATE codes yourself.</p>
                             
                             <div class="error-hierarchy">
                                 <h4>Exception Hierarchy</h4>
@@ -947,7 +949,7 @@ asyncio.run(main())</code></pre>
                                 <div class="reason-icon">📦</div>
                                 <div class="reason-content">
                                     <h4>No Dependencies</h4>
-                                    <p>No external Python dependencies to slow things down</p>
+                                    <p>No external Python dependencies</p>
                                 </div>
                             </div>
                         </div>
@@ -1053,7 +1055,7 @@ asyncio.run(main())</code></pre>
                 <div class="footer-section">
                     <h3 class="footer-title">PostPyro</h3>
                     <p class="footer-description">
-                        High-Performance PostgreSQL Driver for Python built with Rust, PyO3, and sqlx.
+                        Async PostgreSQL driver for Python, built with Rust, PyO3, and sqlx.
                     </p>
                     <div class="footer-links">
                         <a href="https://github.com/magi8101/PostPyro" target="_blank" class="footer-link">

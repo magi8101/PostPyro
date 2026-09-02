@@ -2,27 +2,21 @@
 
 **Async PostgreSQL Driver for Python Built with Rust**
 
-PostPyro is a modern, async PostgreSQL driver for Python that combines the safety and performance of Rust with the simplicity of Python. Built with PyO3/`pyo3-asyncio` and `sqlx`, every I/O method is `async def` and releases the GIL while waiting on Postgres.
+PostPyro is an async PostgreSQL driver for Python built with PyO3/`pyo3-asyncio` and `sqlx`. Every I/O method is `async def` and releases the GIL while waiting on Postgres.
 
 > **Status: Beta.** This document describes the current, real API surface (`python/PostPyro/__init__.pyi`) of an in-progress async rewrite - not a roadmap or aspiration. If a method isn't documented here, it doesn't exist yet.
 
-## 🚀 Key Features
+This is the full reference - every method, type, and exception. If you just want a query running, [`README.md`](README.md) has a shorter quick start.
 
-- **🔥 Rust-Powered**: Native performance via `sqlx`'s binary protocol
-- **⚡ Fully Async**: Every I/O-bound call is `await`-able and releases the GIL while waiting on Postgres
-- **🛡️ Memory Safe**: Rust's ownership system prevents memory leaks and segfaults
-- **🌐 Core PostgreSQL Types**: Booleans, integers, floats, `NUMERIC`, text, dates/times, UUIDs, JSON/JSONB (see the [type table](#supported-type-conversions) for what's decodable today - arrays, `BYTEA`, and network types aren't yet)
-- **🔒 Type Safety**: Comprehensive type checking and conversion
-- **🔐 TLS-capable**: Connections can use `sqlx`'s `rustls` backend
-- **🎯 Familiar Errors**: DB-API 2.0-flavored exception hierarchy
+PostPyro runs `sqlx`'s binary protocol under PyO3, so every `await` releases the GIL for the duration of the wait instead of blocking the interpreter. Rust's ownership system rules out the memory-safety bugs (leaks, segfaults) that hand-rolled C bindings are prone to. TLS is available through `sqlx`'s `rustls` backend, and errors surface through a DB-API 2.0-flavored exception hierarchy rather than raw `sqlx` errors. The type system covers booleans, integers, floats, `NUMERIC`, text, dates/times, UUIDs, and JSON/JSONB automatically - see the [type table](#supported-type-conversions) for exactly what's decodable today (arrays, `BYTEA`, and network types aren't yet).
 
-## 📦 Installation
+## Installation
 
 ```bash
 pip install PostPyro
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```python
 import asyncio
@@ -48,7 +42,7 @@ async def main():
 asyncio.run(main())
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### Module Constants
 
@@ -74,7 +68,7 @@ pool = await PostPyro.connect("postgresql://user:pass@host:port/database", max_s
 # - With SSL: postgresql://user:pass@host/db?sslmode=require
 ```
 
-## 🏊 Pool Class
+## Pool Class
 
 `Pool` is a connection pool (backed by `sqlx::PgPool`). There is no separate single-connection class - `Pool` is the entry point for all queries, whether you're using one connection or many.
 
@@ -161,7 +155,7 @@ if not pool.is_closed():
     await pool.query("SELECT 1")
 ```
 
-## 📄 Row Class
+## Row Class
 
 Represents a single row from a query result with dict-like interface.
 
@@ -183,66 +177,23 @@ print(row[0])  # id
 print(row[1])  # name
 ```
 
-#### `__len__() -> int`
+#### `__len__() -> int`, `__iter__()`, `get(key, default=None)`, `keys()`, `values()`, `items()`, `to_dict()`
 
-Get the number of columns.
+`Row` behaves like a read-only mapping - `len()`, iteration, `.get()` with a default, and dict-style `keys()`/`values()`/`items()` all work as you'd expect from a `dict`. `to_dict()` gives you a real `dict` when something downstream (pandas, `json.dumps`, ...) needs one instead of a `Row`.
 
 ```python
 column_count = len(row)
-```
-
-#### `__iter__()`
-
-Iterate over column values.
-
-```python
 for value in row:
     print(value)
-```
-
-#### `get(key: Union[int, str], default: Any = None) -> Any`
-
-Get a column value with a default if not found.
-
-```python
 age = row.get('age', 0)
-```
-
-#### `keys() -> List[str]`
-
-Get all column names.
-
-```python
-columns = row.keys()
-print(f"Columns: {columns}")
-```
-
-#### `values() -> List[Any]`
-
-Get all column values.
-
-```python
-values = row.values()
-```
-
-#### `items() -> List[Tuple[str, Any]]`
-
-Get (column, value) pairs.
-
-```python
+print(row.keys())
+print(row.values())
 for column, value in row.items():
     print(f"{column}: {value}")
-```
-
-#### `to_dict() -> Dict[str, Any]`
-
-Convert row to a Python dictionary.
-
-```python
 user_dict = row.to_dict()
 ```
 
-## 🔄 Transaction Class
+## Transaction Class
 
 Obtained via `await pool.transaction()`. Represents a database transaction with automatic commit/rollback when used as an `async with` block.
 
@@ -293,9 +244,9 @@ Explicitly roll back the transaction.
 
 Check whether the transaction is still open (synchronous). Returns `False` after `commit()` or `rollback()`. Using `execute`/`query`/`query_one` after that point raises `ProgrammingError` rather than hanging or panicking.
 
-## ⚠️ Error Handling
+## Error Handling
 
-PostPyro provides comprehensive PostgreSQL error mapping with specific exception types.
+PostPyro maps every `sqlx`/Postgres error onto the DB-API 2.0-flavored hierarchy below, so you can catch by class instead of parsing SQLSTATE codes yourself.
 
 ### Exception Hierarchy
 
@@ -329,7 +280,7 @@ async def main():
         print(f"General database error: {e}")
 ```
 
-## 🎯 Type System
+## Type System
 
 PostPyro automatically converts between Python and PostgreSQL types.
 
@@ -391,7 +342,7 @@ assert isinstance(row['date_col'], date)
 assert isinstance(row['json_col'], dict)
 ```
 
-## 🌐 Integration with Other Libraries
+## Integration with Other Libraries
 
 ### Pandas Integration
 
@@ -476,15 +427,15 @@ users = UserRepository(pool)
 await users.save("Alice", "alice@example.com")
 ```
 
-## ⚡ Performance Notes
+## Performance Notes
 
-- **🦀 Rust Backend**: Native performance without Python interpreter overhead for parsing/encoding
-- **⚡ Async I/O**: `sqlx`'s async networking releases the GIL during I/O instead of blocking the whole process
-- **🎯 Binary Protocol**: Fast binary protocol parsing in Rust
+- **Rust backend**: parsing and encoding happen in Rust, not the Python interpreter
+- **Async I/O**: `sqlx`'s async networking releases the GIL during I/O instead of blocking the whole process
+- **Binary protocol**: query results come back over Postgres's binary wire protocol, parsed in Rust
 
 The performance comparisons published for earlier (pre-rewrite, synchronous) versions of PostPyro no longer apply to this async driver and have not been re-benchmarked yet; treat any such numbers you find elsewhere as stale.
 
-## 🛠️ Advanced Usage
+## Advanced Usage
 
 ### Pooling
 
@@ -531,7 +482,7 @@ async def robust_query(pool: PostPyro.Pool, sql, params=None, max_retries=3):
             raise
 ```
 
-## 🌟 Best Practices
+## Best Practices
 
 ### 1. Pool Lifecycle
 
@@ -592,15 +543,7 @@ except Exception as e:
     print(f"Something went wrong: {e}")
 ```
 
-## 📊 Performance Tips
-
-1. **Use transactions** to group related operations
-2. **Size the pool** (`max_size`/`min_size` on `connect()`) to your workload's concurrency
-3. **Close the pool** on shutdown to free connections
-4. **Leverage `Row.to_dict()`** for pandas integration
-5. **Use `query_one()`** when expecting a single result
-
-## 🔧 Configuration
+## Configuration
 
 ### Connection String Options
 
@@ -618,7 +561,7 @@ pool = await PostPyro.connect("postgresql://user:pass@host/db?connect_timeout=10
 pool = await PostPyro.connect("postgresql://user:pass@host/db", max_size=20, min_size=2)
 ```
 
-## 🆚 Migration from Other Drivers
+## Migration from Other Drivers
 
 ### From psycopg2 (sync)
 
@@ -656,7 +599,7 @@ rows = await pool.query("SELECT * FROM users WHERE id = $1", [123])
 await pool.close()
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 **Connection refused / authentication failed**
 
@@ -677,19 +620,6 @@ await pool.execute("INSERT INTO users (age) VALUES ($1)", [25])    # ✅ int
 await pool.execute("INSERT INTO users (age) VALUES ($1)", ["25"])  # ❌ string
 ```
 
-## 🎯 Summary
-
-- **🚀 Fast**: Rust + `sqlx` binary protocol
-- **⚡ Fully async**: releases the GIL during I/O
-- **🛡️ Memory safe**: Rust's ownership system
-- **📦 Easy to install**: pre-built wheels, no system dependencies
-
-```bash
-pip install PostPyro
-```
-
 ---
 
-**Built with ❤️ using Rust, PyO3, and sqlx**
-
-For more examples and advanced usage, visit our [GitHub repository](https://github.com/magi8101/PostPyro).
+Built with Rust, PyO3, and sqlx. For more examples and advanced usage, see the [GitHub repository](https://github.com/magi8101/PostPyro).

@@ -25,7 +25,7 @@ All notable changes to PostPyro will be documented in this file.
 
 ## [1.0.0] - 2025-10-03
 
-### 🎉 First Production Release!
+### First production release
 
 ### Added
 
