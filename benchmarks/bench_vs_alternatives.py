@@ -30,8 +30,8 @@ try:
     import psycopg
     from psycopg_pool import AsyncConnectionPool
 except ImportError:
-    psycopg = None
-    AsyncConnectionPool = None
+    psycopg = None  # type: ignore[assignment]
+    AsyncConnectionPool = None  # type: ignore[assignment, misc]
 
 DSN = sys.argv[1] if len(sys.argv) > 1 else "postgresql://postgres:postgres@localhost:5433/postgres"
 
@@ -46,7 +46,7 @@ BULK_ROWS = 1000     # single-row INSERTs per repetition (none of the three
                      # advantage PostPyro has no equivalent for)
 CONCURRENCY = 20     # concurrent tasks for the concurrency benchmark
 
-results = []  # (driver, benchmark, [elapsed_seconds, ...])
+results: list[tuple[str, str, list[float]]] = []  # (driver, benchmark, [elapsed_seconds, ...])
 
 
 def record(driver, name, samples):

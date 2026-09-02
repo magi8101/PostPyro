@@ -1,3 +1,8 @@
+// The crate/module/function name must be exactly `PostPyro` - it's the
+// Python import name (`import PostPyro`), which PyO3's #[pymodule] requires
+// to match the function name verbatim.
+#![allow(non_snake_case)]
+
 use pyo3::prelude::*;
 
 mod error;

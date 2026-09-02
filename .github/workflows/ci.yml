@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check
+        run: cargo check
+
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test --lib
+        run: cargo test --lib
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python build/check tools
+        run: pip install maturin mypy
+
+      - name: Install benchmark comparison drivers
+        run: pip install -r benchmarks/requirements.txt
+
+      - name: Build the extension
+        run: maturin develop --release
+
+      - name: mypy (tests/ and benchmarks/ against the .pyi stub)
+        run: mypy tests/ benchmarks/
+
+      - name: Integration tests (live Postgres)
+        run: |
+          python3 tests/pool_and_row.py
+          python3 tests/transaction.py
+          python3 tests/type_conversion_bugs.py
+
+      - name: Concurrency correctness harness (live Postgres)
+        run: python3 benchmarks/bench_concurrency_correctness.py
+
+      - name: Driver comparison benchmark (informational, not a gate)
+        run: python3 benchmarks/bench_vs_alternatives.py
+        continue-on-error: true

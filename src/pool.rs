@@ -95,7 +95,7 @@ impl Pool {
 /// Create a new connection pool. This is the only way to obtain a `Pool`.
 #[pyfunction]
 #[pyo3(signature = (dsn, max_size=10, min_size=0))]
-pub fn connect(py: Python, dsn: String, max_size: u32, min_size: u32) -> PyResult<&PyAny> {
+pub fn connect(py: Python<'_>, dsn: String, max_size: u32, min_size: u32) -> PyResult<&PyAny> {
     pyo3_asyncio::tokio::future_into_py(py, async move {
         let pool = PgPoolOptions::new()
             .max_connections(max_size)

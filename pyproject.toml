@@ -44,3 +44,12 @@ Changelog = "https://github.com/magi8101/PostPyro/blob/main/CHANGELOG.md"
 [tool.maturin]
 python-source = "python"
 features = ["pyo3/extension-module"]
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "python"
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
