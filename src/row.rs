@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBool, PyDict, PyList};
 use sqlx::postgres::PgRow;
 use sqlx::{Column, Row as SqlxRow};
 
@@ -19,6 +19,15 @@ impl Row {
     }
 
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
+        // `bool` is a subclass of `int` in Python, so `key.extract::<usize>()`
+        // would silently accept `row[True]` as `row[1]`. Reject it explicitly
+        // rather than let it fall through to whichever branch happens to
+        // extract it.
+        if key.is_instance_of::<PyBool>() {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Row indices must be an int or str, not bool",
+            ));
+        }
         if let Ok(idx) = key.extract::<usize>() {
             self.values
                 .get(idx)
@@ -49,6 +58,9 @@ impl Row {
 
     #[pyo3(signature = (key, default=None))]
     fn get(&self, py: Python, key: &PyAny, default: Option<PyObject>) -> PyResult<PyObject> {
+        if key.is_instance_of::<PyBool>() {
+            return Err(pyo3::exceptions::PyTypeError::new_err("key must be an int or str, not bool"));
+        }
         let found = if let Ok(idx) = key.extract::<usize>() {
             self.values.get(idx).map(|v| v.clone_ref(py))
         } else if let Ok(name) = key.extract::<&str>() {

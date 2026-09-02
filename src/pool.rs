@@ -4,7 +4,7 @@ use sqlx::postgres::{PgPool, PgPoolOptions};
 
 use crate::error::map_db_error;
 use crate::row::Row;
-use crate::types::{bind_params, pg_value_to_py as _pg_value_to_py};
+use crate::types::bind_params;
 
 /// An async PostgreSQL connection pool. Construct via the module-level
 /// `connect()` factory - there is no synchronous constructor, since
