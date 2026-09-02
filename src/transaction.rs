@@ -8,9 +8,9 @@ use crate::error::{map_db_error, transaction_completed_error};
 use crate::row::Row;
 use crate::types::bind_params;
 
-/// A running transaction. Obtained via `pool.transaction()`; used as
-/// `async with pool.transaction() as tx:` for auto-commit on success and
-/// auto-rollback on exception, or explicit commit()/rollback().
+/// A running transaction. Obtain via `tx = await pool.transaction()`, then
+/// either `async with tx:` for auto-commit on success and auto-rollback on
+/// exception, or explicit `commit()`/`rollback()`.
 #[pyclass]
 pub struct Transaction {
     inner: Arc<Mutex<Option<SqlxTransaction<'static, Postgres>>>>,
