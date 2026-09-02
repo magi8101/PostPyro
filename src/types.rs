@@ -1,7 +1,7 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString};
-use rust_decimal::Decimal;
 use sqlx::postgres::PgRow;
 use sqlx::postgres::types::Oid;
 use sqlx::{Column, Postgres, Row as SqlxRow, TypeInfo};
@@ -109,16 +109,12 @@ where
 }
 
 /// NUMERIC has no native Python scalar equivalent - decode via
-/// `rust_decimal::Decimal` (sqlx's `rust_decimal` feature) and hand the
-/// exact string representation to Python's `decimal.Decimal` so we don't
-/// round-trip through a lossy `f64`.
-///
-/// ponytail: `rust_decimal::Decimal` caps out around 28-29 significant
-/// digits, narrower than Postgres's arbitrary-precision NUMERIC. Upgrade to
-/// `sqlx`'s `bigdecimal` feature (`sqlx::types::BigDecimal`) if a column
-/// genuinely needs more than that.
+/// `bigdecimal::BigDecimal` (sqlx's `bigdecimal` feature, arbitrary
+/// precision - unlike `rust_decimal::Decimal`, which caps out around 28-29
+/// significant digits) and hand the exact string representation to Python's
+/// `decimal.Decimal` so we don't round-trip through a lossy `f64`.
 fn decode_numeric(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject> {
-    let value: Option<Decimal> = row.try_get(idx).map_err(map_db_error)?;
+    let value: Option<BigDecimal> = row.try_get(idx).map_err(map_db_error)?;
     match value {
         None => Ok(py.None()),
         Some(d) => {
@@ -233,6 +229,8 @@ fn json_to_py(py: Python, value: &serde_json::Value) -> PyObject {
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 i.into_py(py)
+            } else if let Some(u) = n.as_u64() {
+                u.into_py(py)
             } else if let Some(f) = n.as_f64() {
                 f.into_py(py)
             } else {
