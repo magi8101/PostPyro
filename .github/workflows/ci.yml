@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Diagnostic only - the abort panic under panic="abort" doesn't unwind,
+      # but a backtrace still gets printed before the process aborts.
+      RUST_BACKTRACE: full
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check
+        run: cargo check
+
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test --lib
+        run: cargo test --lib
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Create virtualenv
+        # maturin develop requires an active virtualenv (VIRTUAL_ENV set) to
+        # find - actions/setup-python installs Python directly, it doesn't
+        # create one. Adding .venv/bin to GITHUB_PATH makes every later step
+        # use it automatically, without needing `source activate` per step.
+        run: |
+          python -m venv .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
+
+      - name: Install Python build/check tools
+        run: pip install maturin mypy
+
+      - name: Install benchmark comparison drivers
+        run: pip install -r benchmarks/requirements.txt
+        continue-on-error: true # only used by the informational comparison benchmark below
+
+      - name: Build the extension
+        run: maturin develop --release
+
+      - name: mypy (tests/ and benchmarks/ against the .pyi stub)
+        run: mypy tests/ benchmarks/
+
+      - name: Integration tests (live Postgres)
+        run: |
+          python3 tests/pool_and_row.py
+          python3 tests/transaction.py
+          python3 tests/type_conversion_bugs.py
+
+      - name: Concurrency correctness harness (live Postgres)
+        run: python3 benchmarks/bench_concurrency_correctness.py
+
+      - name: Driver comparison benchmark (informational, not a gate)
+        run: python3 benchmarks/bench_vs_alternatives.py
+        continue-on-error: true

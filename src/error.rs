@@ -12,17 +12,6 @@ create_exception!(PostPyro, InternalError, DatabaseError);
 create_exception!(PostPyro, ProgrammingError, DatabaseError);
 create_exception!(PostPyro, NotSupportedError, DatabaseError);
 
-pub fn type_conversion_error(expected: &str, actual: &str) -> PyErr {
-    DataError::new_err(format!(
-        "Type conversion error: expected {}, got {}",
-        expected, actual
-    ))
-}
-
-pub fn invalid_connection_string_error(details: &str) -> PyErr {
-    InterfaceError::new_err(format!("Invalid connection string: {}", details))
-}
-
 pub fn transaction_completed_error() -> PyErr {
     ProgrammingError::new_err("Transaction is already committed or rolled back")
 }
