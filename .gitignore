@@ -115,7 +115,6 @@ Icon?
 # Development and testing files
 *_test.py
 test_*.py
-tests/
 demo.py
 kinsta_cloud_test.py
 async_demo.py
