@@ -1,0 +1,11 @@
+version: 2
+secret:
+  # .github/workflows/ci.yml's POSTGRES_PASSWORD is the credential for the
+  # ephemeral Postgres service container GitHub Actions spins up for each CI
+  # run - it exists only inside that one job, is never reachable from outside
+  # the runner, and holds no real data. Every test/benchmark script in this
+  # repo already hardcodes the same "postgres"/"postgres" local-only test
+  # credential (see tests/*.py, benchmarks/*.py). Not a real secret, nothing
+  # to rotate - excluding the one file it appears in from secret scanning.
+  ignored_paths:
+    - .github/workflows/ci.yml
