@@ -55,8 +55,7 @@
                         Async PostgreSQL Driver for Python, Built with Rust
                     </p>
                     <p class="hero-description">
-                        PostPyro combines the safety and performance of Rust with the simplicity of Python.
-                        Built with PyO3 and sqlx, it's a fully async driver - every I/O method is
+                        Built with PyO3 and sqlx, PostPyro is a fully async driver - every I/O method is
                         <code>async def</code> and releases the GIL while waiting on Postgres - with
                         DB-API 2.0-flavored exception handling.
                     </p>
@@ -173,7 +172,7 @@ asyncio.run(main())</code></pre>
                         <p class="feature-description">
                             Postgres values decode to native Python types automatically. Bound parameters other than
                             <code>bool</code>/<code>int</code>/<code>float</code>/<code>str</code>/<code>None</code> need
-                            an explicit <code>::type</code> cast in the SQL text - see the Type System reference below.
+                            an explicit <code>::type</code> cast in the SQL text - see the <a href="#api-types">Type System reference</a> below.
                         </p>
                     </div>
                     <div class="feature-card">

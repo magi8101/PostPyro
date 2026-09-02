@@ -179,7 +179,7 @@ print(row[1])  # name
 
 #### `__len__() -> int`, `__iter__()`, `get(key, default=None)`, `keys()`, `values()`, `items()`, `to_dict()`
 
-`Row` behaves like a read-only mapping - `len()`, iteration, `.get()` with a default, and dict-style `keys()`/`values()`/`items()` all work as you'd expect from a `dict`. `to_dict()` gives you a real `dict` when something downstream (pandas, `json.dumps`, ...) needs one instead of a `Row`.
+`Row` mirrors a read-only mapping's interface without being one: `len()`, iteration, `.get()` with a default, and `keys()`/`values()`/`items()` all work, but the latter three return plain `list`s (per the `.pyi`), not `dict` view objects - no set operations (`&`, `|`) and no live reflection of later changes. `to_dict()` gives you a real `dict` when something downstream (pandas, `json.dumps`, ...) needs one instead of a `Row`.
 
 ```python
 column_count = len(row)
