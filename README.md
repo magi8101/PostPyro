@@ -101,7 +101,10 @@ for row in rows:
 
 #### `await pool.query_one(query, params=None) -> Row`
 
-Execute a SELECT and return exactly one row. Raises an error if zero or multiple rows are returned.
+Execute a SELECT and return its first row. Raises `ProgrammingError` if zero
+rows are returned. If more than one row matches, the extras are silently
+discarded rather than raising - only use this when your query itself
+guarantees at most one row (a primary-key lookup, `LIMIT 1`, etc.).
 
 ```python
 user = await pool.query_one("SELECT * FROM users WHERE id = $1", [1])
@@ -252,30 +255,39 @@ naming the type, rather than silently returning the wrong value or `None`.
 
 #### Type Usage Example
 
-```python
-from datetime import datetime, date
-import uuid
+Binding parameters only auto-converts `bool`/`int`/`float`/`str`/`None` -
+anything else (a `date`, `datetime`, `uuid.UUID`, `dict`, ...) has no
+automatic Python→Postgres conversion. Pass it as a string and add an
+explicit Postgres cast in the SQL text instead:
 
-# Insert various types
+```python
+import json
+import uuid
+from datetime import date
+
+# Insert various types - non-primitive values go in as strings, with an
+# explicit ::type cast telling Postgres what to parse them as.
 await pool.execute("""
     INSERT INTO mixed_types (
         bool_col, int_col, float_col, text_col,
         date_col, timestamp_col, uuid_col, json_col
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ) VALUES ($1, $2, $3, $4, $5::date, $6::timestamp, $7::uuid, $8::jsonb)
 """, [
-    True,                                    # boolean
-    42,                                      # integer
-    3.14159,                                 # float
-    "Hello PostgreSQL",                      # text
-    date(2023, 12, 25),                     # date
-    datetime(2023, 12, 25, 14, 30, 0),      # timestamp
-    uuid.uuid4(),                           # uuid
-    {"name": "John", "scores": [85, 92, 78]} # json
+    True,                                     # boolean - auto-converted
+    42,                                       # integer - auto-converted
+    3.14159,                                  # float - auto-converted
+    "Hello PostgreSQL",                       # text - auto-converted
+    "2023-12-25",                             # date - string + ::date cast
+    "2023-12-25 14:30:00",                    # timestamp - string + ::timestamp cast
+    str(uuid.uuid4()),                        # uuid - string + ::uuid cast
+    json.dumps({"name": "John", "scores": [85, 92, 78]}),  # json - string + ::jsonb cast
 ])
 
-# Query returns properly typed values
+# Reading back decodes to the right Python type automatically (this
+# direction IS automatic - see the table above).
 row = await pool.query_one("SELECT * FROM mixed_types WHERE id = $1", [1])
 assert isinstance(row['bool_col'], bool)
+assert isinstance(row['date_col'], date)
 assert isinstance(row['json_col'], dict)
 ```
 

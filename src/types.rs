@@ -56,20 +56,29 @@ impl<'q> sqlx::Encode<'q, Postgres> for UnspecifiedNull {
 /// narrower INT2/INT4 column needs an exact type match, cast in the SQL
 /// text (`$1::int4`). Revisit only if this becomes a real friction point.
 ///
-/// Every query built here is marked non-persistent (`.persistent(false)`).
-/// sqlx's prepared-statement cache is keyed on the raw SQL text only, not on
+/// Only a query that binds at least one `None` is marked non-persistent
+/// (`.persistent(false)`); everything else keeps sqlx's normal prepared-
+/// statement caching. sqlx's cache is keyed on the raw SQL text only, not on
 /// the bound argument types (see `PgConnection::get_or_prepare`). Since a
-/// `None` parameter is now bound with `PgTypeInfo::with_oid(Oid(0))`
+/// `None` parameter is bound with `PgTypeInfo::with_oid(Oid(0))`
 /// ("unspecified" - let Postgres infer it), the *first* execution of a given
 /// SQL text bakes whatever type Postgres inferred into the cached prepared
 /// statement; a later call to the same SQL text with a real (non-NULL) value
 /// of a different wire size (e.g. our i64 for Python ints vs. an inferred
-/// INT4 column) then fails with "incorrect binary data format in bind
-/// parameter" - live-verified against Postgres 16. Disabling the
-/// server-side statement cache avoids the collision at the cost of a fresh
-/// Parse+Describe round trip per query. Upgrade path if that cost matters:
-/// key the cache on (SQL text, argument type fingerprint) instead of SQL
-/// text alone.
+/// INT4 column) would then fail with "incorrect binary data format in bind
+/// parameter" - live-verified against Postgres 16. Marking only the
+/// NULL-binding calls non-persistent avoids the collision without paying a
+/// fresh Parse+Describe round trip on every query. Upgrade path if a
+/// collision is ever seen anyway (e.g. NULL and non-NULL calls interleaved
+/// concurrently on the same SQL text): key the cache on (SQL text, argument
+/// type fingerprint) instead of SQL text alone.
+///
+/// Anything that isn't `bool`/`int`/`float`/`str`/`None` falls through to
+/// `str(obj)` and binds as TEXT (see the `else` arm below) - there is no
+/// automatic conversion for `date`/`datetime`/`uuid.UUID`/`dict`/etc., unlike
+/// the read side's `pg_value_to_py`. Pass those as strings with an explicit
+/// Postgres cast in the SQL text instead (`$1::date`, `$1::uuid`,
+/// `$1::jsonb`) - see `tests/type_conversion_bugs.py` for working examples.
 pub fn bind_params<'q>(
     query: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
     py: Python,
