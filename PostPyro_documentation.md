@@ -1,19 +1,20 @@
 # PostPyro Documentation
 
-**High-Performance PostgreSQL Driver for Python Built with Rust**
+**Async PostgreSQL Driver for Python Built with Rust**
 
-PostPyro is a modern, blazingly fast PostgreSQL driver for Python that combines the safety and performance of Rust with the simplicity of Python. Built with PyO3 and tokio-postgres, it provides DB-API 2.0 compliance while delivering superior performance through native Rust implementation.
+PostPyro is a modern, async PostgreSQL driver for Python that combines the safety and performance of Rust with the simplicity of Python. Built with PyO3/`pyo3-asyncio` and `sqlx`, every I/O method is `async def` and releases the GIL while waiting on Postgres.
+
+> **Status: Beta.** This document describes the current, real API surface (`python/PostPyro/__init__.pyi`) of an in-progress async rewrite - not a roadmap or aspiration. If a method isn't documented here, it doesn't exist yet.
 
 ## 🚀 Key Features
 
-- **🔥 High Performance**: Rust-powered backend with zero-copy data handling
+- **🔥 Rust-Powered**: Native performance via `sqlx`'s binary protocol
+- **⚡ Fully Async**: Every I/O-bound call is `await`-able and releases the GIL while waiting on Postgres
 - **🛡️ Memory Safe**: Rust's ownership system prevents memory leaks and segfaults
 - **🌐 Full PostgreSQL Support**: All data types, arrays, JSON, UUIDs, network types
-- **⚡ Tokio Async I/O**: Native async I/O under the hood for excellent performance
 - **🔒 Type Safety**: Comprehensive type checking and conversion
-- **🎯 DB-API 2.0 Compliant**: Standard Python database interface
-- **🌊 Simple API**: Clean, intuitive interface that's easier than alternatives
-- **📦 Zero Dependencies**: Self-contained with no external Python dependencies
+- **🔐 TLS-capable**: Connections can use `sqlx`'s `rustls` backend
+- **🎯 Familiar Errors**: DB-API 2.0-flavored exception hierarchy
 
 ## 📦 Installation
 
@@ -24,24 +25,27 @@ pip install PostPyro
 ## 🚀 Quick Start
 
 ```python
-import PostPyro as pg
+import asyncio
+import PostPyro
 
-# Connect to PostgreSQL
-conn = pg.Connection("postgresql://user:password@localhost:5432/database")
+async def main():
+    pool = await PostPyro.connect("postgresql://user:password@localhost:5432/database", max_size=20)
 
-# Simple query
-users = conn.query("SELECT id, name, email FROM users WHERE active = $1", [True])
-for user in users:
-    print(f"User: {user['name']} ({user['email']})")
+    # Simple query
+    users = await pool.query("SELECT id, name, email FROM users WHERE active = $1", [True])
+    for user in users:
+        print(f"User: {user['name']} ({user['email']})")
 
-# Insert data
-user_id = conn.execute(
-    "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id",
-    ["John Doe", "john@example.com"]
-)
+    # Insert data
+    affected = await pool.execute(
+        "INSERT INTO users (name, email) VALUES ($1, $2)",
+        ["John Doe", "john@example.com"]
+    )
 
-# Close connection
-conn.close()
+    # Close the pool
+    await pool.close()
+
+asyncio.run(main())
 ```
 
 ## 📚 API Reference
@@ -49,20 +53,20 @@ conn.close()
 ### Module Constants
 
 ```python
-PostPyro.__version__      # Driver version (e.g., "0.1.2")
-PostPyro.apilevel         # "2.0" (DB-API 2.0 compliant)
-PostPyro.threadsafety     # 2 (Thread-safe connections)
+PostPyro.__version__      # Driver version
+PostPyro.apilevel         # "2.0" (DB-API 2.0-flavored)
+PostPyro.threadsafety     # Thread-safety level
 PostPyro.paramstyle       # "numeric" (PostgreSQL $1, $2 style)
 ```
 
 ### Functions
 
-#### `connect(connection_string: str) -> Connection`
+#### `await connect(dsn: str, max_size: int = 10, min_size: int = 0) -> Pool`
 
-Create a new database connection.
+Create a connection pool. This is the only way to get a `Pool` - there is no synchronous constructor, since establishing the first connection is itself async (a real network round-trip).
 
 ```python
-conn = PostPyro.connect("postgresql://user:pass@host:port/database")
+pool = await PostPyro.connect("postgresql://user:pass@host:port/database", max_size=20, min_size=2)
 
 # Connection string formats supported:
 # - postgresql://user:password@host:port/database
@@ -70,148 +74,88 @@ conn = PostPyro.connect("postgresql://user:pass@host:port/database")
 # - With SSL: postgresql://user:pass@host/db?sslmode=require
 ```
 
-#### `get_version() -> str`
+## 🏊 Pool Class
 
-Get the driver version.
-
-```python
-version = PostPyro.get_version()  # Returns "0.1.2"
-```
-
-## 🔌 Connection Class
-
-### Constructor
-
-#### `Connection(connection_string: str)`
-
-Create a new connection directly.
-
-```python
-conn = PostPyro.Connection("postgresql://user:pass@localhost/db")
-```
+`Pool` is a connection pool (backed by `sqlx::PgPool`). There is no separate single-connection class - `Pool` is the entry point for all queries, whether you're using one connection or many.
 
 ### Methods
 
-#### `query(sql: str, params: List = None) -> List[Row]`
+#### `await pool.query(sql: str, params: List = None) -> List[Row]`
 
 Execute a SELECT query and return all rows.
 
 ```python
 # Simple query
-rows = conn.query("SELECT * FROM users")
+rows = await pool.query("SELECT * FROM users")
 
 # Parameterized query
-rows = conn.query("SELECT * FROM users WHERE age > $1 AND city = $2", [25, "New York"])
+rows = await pool.query("SELECT * FROM users WHERE age > $1 AND city = $2", [25, "New York"])
 
 # Process results
 for row in rows:
     print(f"ID: {row['id']}, Name: {row['name']}")
 ```
 
-#### `query_one(sql: str, params: List = None) -> Row`
+#### `await pool.query_one(sql: str, params: List = None) -> Row`
 
 Execute a query and return exactly one row. Raises an error if zero or multiple rows returned.
 
 ```python
-user = conn.query_one("SELECT * FROM users WHERE id = $1", [123])
+user = await pool.query_one("SELECT * FROM users WHERE id = $1", [123])
 print(f"User: {user['name']}")
 ```
 
-#### `execute(sql: str, params: List = None) -> int`
+#### `await pool.execute(sql: str, params: List = None) -> int`
 
 Execute INSERT, UPDATE, DELETE, or DDL statements. Returns the number of affected rows.
 
 ```python
 # Insert
-affected = conn.execute(
+affected = await pool.execute(
     "INSERT INTO users (name, email) VALUES ($1, $2)",
     ["Alice", "alice@example.com"]
 )
 
 # Update
-affected = conn.execute(
+affected = await pool.execute(
     "UPDATE users SET email = $1 WHERE id = $2",
     ["newemail@example.com", 123]
 )
 
 # Delete
-affected = conn.execute("DELETE FROM users WHERE active = $1", [False])
+affected = await pool.execute("DELETE FROM users WHERE active = $1", [False])
 
 # DDL
-conn.execute("CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT)")
+await pool.execute("CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT)")
 ```
 
-#### `execute_batch(queries: List[str]) -> List[int]`
+#### `await pool.transaction() -> Transaction`
 
-Execute multiple SQL statements in a batch for improved performance.
-
-```python
-queries = [
-    "INSERT INTO users (name) VALUES ('User 1')",
-    "INSERT INTO users (name) VALUES ('User 2')",
-    "INSERT INTO users (name) VALUES ('User 3')"
-]
-
-results = conn.execute_batch(queries)
-print(f"Inserted {sum(results)} total rows")
-```
-
-#### `prepare(sql: str) -> str`
-
-Prepare a SQL statement for repeated execution. Returns a statement identifier.
+Start a new transaction (a real `BEGIN` round-trip). Because starting one is itself async, you must `await` it *before* using it as a context manager - `async with pool.transaction():` raises `TypeError`, since the un-awaited coroutine has no `__aenter__`.
 
 ```python
-stmt_id = conn.prepare("SELECT * FROM users WHERE department = $1")
-# Use with regular query/execute methods
-```
-
-#### `ping() -> bool`
-
-Test if the connection is alive and responsive.
-
-```python
-if conn.ping():
-    print("Connection is healthy")
-else:
-    print("Connection is dead")
-```
-
-#### `info() -> Dict[str, Any]`
-
-Get detailed connection information and status.
-
-```python
-info = conn.info()
-print(f"Connection closed: {info['closed']}")
-print(f"Connection healthy: {info['healthy']}")
-```
-
-#### `begin() -> Transaction`
-
-Begin a new transaction and return a Transaction object.
-
-```python
-with conn.begin() as tx:
-    tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [123])
+tx = await pool.transaction()
+async with tx:
+    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
+    await tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [123])
     # Automatically commits on successful exit
 ```
 
-#### `close() -> None`
+#### `await pool.close() -> None`
 
-Close the database connection.
+Close the pool and its connections.
 
 ```python
-conn.close()
+await pool.close()
 ```
 
-#### `is_closed() -> bool`
+#### `pool.is_closed() -> bool`
 
-Check if the connection is closed.
+Check if the pool is closed. Synchronous - no `await`.
 
 ```python
-if not conn.is_closed():
-    conn.query("SELECT 1")
+if not pool.is_closed():
+    await pool.query("SELECT 1")
 ```
 
 ## 📄 Row Class
@@ -225,7 +169,7 @@ Represents a single row from a query result with dict-like interface.
 Access column values by index or name.
 
 ```python
-row = conn.query_one("SELECT id, name, email FROM users WHERE id = $1", [1])
+row = await pool.query_one("SELECT id, name, email FROM users WHERE id = $1", [1])
 
 # Access by column name
 print(row['name'])
@@ -297,34 +241,54 @@ user_dict = row.to_dict()
 
 ## 🔄 Transaction Class
 
-Represents a database transaction with automatic rollback on errors.
+Obtained via `await pool.transaction()`. Represents a database transaction with automatic commit/rollback when used as an `async with` block.
 
 ### Methods
 
-#### `execute(sql: str, params: List = None) -> int`
+#### `await tx.execute(sql: str, params: List = None) -> int`
 
 Execute a statement within the transaction.
 
 ```python
-with conn.begin() as tx:
-    tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])
+tx = await pool.transaction()
+async with tx:
+    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
+    await tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])
 ```
 
-#### `query(sql: str, params: List = None) -> List[Row]`
+#### `await tx.query(sql: str, params: List = None) -> List[Row]`
 
 Execute a query within the transaction.
 
 ```python
-with conn.begin() as tx:
-    users = tx.query("SELECT * FROM users WHERE created_today = true")
+tx = await pool.transaction()
+async with tx:
+    users = await tx.query("SELECT * FROM users WHERE created_today = true")
     for user in users:
-        tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])
+        await tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])
 ```
 
-#### `query_one(sql: str, params: List = None) -> Row`
+#### `await tx.query_one(sql: str, params: List = None) -> Row`
 
 Execute a query returning one row within the transaction.
+
+#### `await tx.commit() -> None`
+
+Explicitly commit the transaction. Also works without an `async with` block.
+
+```python
+tx = await pool.transaction()
+await tx.execute("INSERT INTO logs (message) VALUES ($1)", ["Started process"])
+await tx.commit()
+```
+
+#### `await tx.rollback() -> None`
+
+Explicitly roll back the transaction.
+
+#### `tx.is_active() -> bool`
+
+Check whether the transaction is still open (synchronous). Returns `False` after `commit()` or `rollback()`. Using `execute`/`query`/`query_one` after that point raises `ProgrammingError` rather than hanging or panicking.
 
 ## ⚠️ Error Handling
 
@@ -343,26 +307,23 @@ DatabaseError                    # Base database error
 └── NotSupportedError           # Unsupported operations
 ```
 
-### Error Handling Examples
+### Error Handling Example
 
 ```python
-import PostPyro as pg
+import PostPyro
 
-try:
-    conn = pg.Connection("postgresql://user:pass@localhost/db")
-    conn.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
-
-except pg.IntegrityError as e:
-    print(f"Constraint violation: {e}")
-
-except pg.OperationalError as e:
-    print(f"Database operation failed: {e}")
-
-except pg.ProgrammingError as e:
-    print(f"SQL error: {e}")
-
-except pg.DatabaseError as e:
-    print(f"General database error: {e}")
+async def main():
+    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
+    try:
+        await pool.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
+    except PostPyro.IntegrityError as e:
+        print(f"Constraint violation: {e}")
+    except PostPyro.OperationalError as e:
+        print(f"Database operation failed: {e}")
+    except PostPyro.ProgrammingError as e:
+        print(f"SQL error: {e}")
+    except PostPyro.DatabaseError as e:
+        print(f"General database error: {e}")
 ```
 
 ## 🎯 Type System
@@ -372,7 +333,7 @@ PostPyro automatically converts between Python and PostgreSQL types.
 ### Supported Type Conversions
 
 | PostgreSQL Type            | Python Type         | Example                                        |
-| -------------------------- | ------------------- | ---------------------------------------------- |
+| --------------------------- | -------------------- | ------------------------------------------------ |
 | `BOOLEAN`                  | `bool`              | `True`, `False`                                |
 | `SMALLINT`, `INTEGER`      | `int`               | `42`, `-123`                                   |
 | `BIGINT`                   | `int`               | `9223372036854775807`                          |
@@ -388,14 +349,14 @@ PostPyro automatically converts between Python and PostgreSQL types.
 | `ARRAY`                    | `list`              | `[1, 2, 3]`, `["a", "b", "c"]`                 |
 | `INET`, `CIDR`             | `str`               | `"192.168.1.1"`, `"192.168.0.0/24"`            |
 
-### Type Usage Examples
+### Type Usage Example
 
 ```python
 from datetime import datetime, date
 import uuid
 
 # Insert various types
-conn.execute("""
+await pool.execute("""
     INSERT INTO mixed_types (
         bool_col, int_col, float_col, text_col,
         date_col, timestamp_col, uuid_col, json_col
@@ -412,7 +373,7 @@ conn.execute("""
 ])
 
 # Query returns properly typed values
-row = conn.query_one("SELECT * FROM mixed_types WHERE id = $1", [1])
+row = await pool.query_one("SELECT * FROM mixed_types WHERE id = $1", [1])
 assert isinstance(row['bool_col'], bool)
 assert isinstance(row['json_col'], dict)
 ```
@@ -423,355 +384,208 @@ assert isinstance(row['json_col'], dict)
 
 ```python
 import pandas as pd
-import PostPyro as pg
+import PostPyro
 
-conn = pg.Connection("postgresql://user:pass@localhost/db")
+pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
 
 # Query to DataFrame
-rows = conn.query("SELECT * FROM sales_data")
+rows = await pool.query("SELECT * FROM sales_data")
 df = pd.DataFrame([row.to_dict() for row in rows])
-
-# Or using list comprehension
-df = pd.DataFrame([dict(row.items()) for row in rows])
 
 print(df.head())
 ```
 
-### SQLAlchemy Style Usage
-
-```python
-import PostPyro as pg
-
-class DatabaseManager:
-    def __init__(self, connection_string):
-        self.conn = pg.Connection(connection_string)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.conn.close()
-
-    def fetch_users(self, active_only=True):
-        return self.conn.query(
-            "SELECT * FROM users WHERE active = $1",
-            [active_only]
-        )
-
-# Usage
-with DatabaseManager("postgresql://user:pass@localhost/db") as db:
-    users = db.fetch_users()
-    for user in users:
-        print(user['name'])
-```
-
 ### FastAPI Integration
+
+FastAPI is natively async, so a `Pool` fits it directly - no thread-pool bridging needed.
 
 ```python
 from fastapi import FastAPI, HTTPException
-import PostPyro as pg
+import PostPyro
 
 app = FastAPI()
+pool: PostPyro.Pool
 
-# Database connection
-conn = pg.Connection("postgresql://user:pass@localhost/db")
+@app.on_event("startup")
+async def startup():
+    global pool
+    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
+
+@app.on_event("shutdown")
+async def shutdown():
+    await pool.close()
 
 @app.get("/users/{user_id}")
 async def get_user(user_id: int):
     try:
-        user = conn.query_one(
+        user = await pool.query_one(
             "SELECT id, name, email FROM users WHERE id = $1",
             [user_id]
         )
         return user.to_dict()
-    except pg.DatabaseError:
+    except PostPyro.DatabaseError:
         raise HTTPException(status_code=404, detail="User not found")
 
 @app.post("/users")
 async def create_user(name: str, email: str):
     try:
-        result = conn.execute(
-            "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id",
+        await pool.execute(
+            "INSERT INTO users (name, email) VALUES ($1, $2)",
             [name, email]
         )
-        return {"id": result, "message": "User created"}
-    except pg.IntegrityError:
+        return {"message": "User created"}
+    except PostPyro.IntegrityError:
         raise HTTPException(status_code=400, detail="Email already exists")
 ```
 
-### Django-Style Models
+### Lightweight Repository Pattern
 
 ```python
-import PostPyro as pg
+import PostPyro
 
-class Model:
-    def __init__(self, connection_string):
-        self.conn = pg.Connection(connection_string)
+class UserRepository:
+    def __init__(self, pool: PostPyro.Pool):
+        self.pool = pool
 
-    def save(self):
-        # Implement save logic
-        pass
+    async def find_by_email(self, email: str):
+        row = await self.pool.query_one("SELECT * FROM users WHERE email = $1", [email])
+        return row.to_dict()
 
-    @classmethod
-    def find(cls, **kwargs):
-        # Implement find logic
-        pass
-
-class User(Model):
-    def __init__(self, connection_string, name=None, email=None):
-        super().__init__(connection_string)
-        self.name = name
-        self.email = email
-
-    def save(self):
-        return self.conn.execute(
+    async def save(self, name: str, email: str):
+        return await self.pool.execute(
             "INSERT INTO users (name, email) VALUES ($1, $2)",
-            [self.name, self.email]
+            [name, email]
         )
 
-    @classmethod
-    def find_by_email(cls, conn, email):
-        row = conn.query_one(
-            "SELECT * FROM users WHERE email = $1",
-            [email]
-        )
-        return cls(None, row['name'], row['email'])
+# Usage
+pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
+users = UserRepository(pool)
+await users.save("Alice", "alice@example.com")
 ```
 
-## ⚡ Performance Advantages
+## ⚡ Performance Notes
 
-### Why PostPyro is Faster
+- **🦀 Rust Backend**: Native performance without Python interpreter overhead for parsing/encoding
+- **⚡ Async I/O**: `sqlx`'s async networking releases the GIL during I/O instead of blocking the whole process
+- **🎯 Binary Protocol**: Fast binary protocol parsing in Rust
 
-1. **🦀 Rust Backend**: Native performance without Python interpreter overhead
-2. **⚡ Zero-Copy**: Direct memory mapping between PostgreSQL and Python
-3. **🌊 Async I/O**: Tokio-powered async networking under the hood
-4. **🎯 Optimized Parsing**: Fast binary protocol parsing in Rust
-5. **📦 No Dependencies**: No external Python dependencies to slow things down
-
-### Comparison with Other Drivers
-
-| Feature        | PostPyro      | psycopg2       | asyncpg       | psycopg3       |
-| -------------- | ------------- | -------------- | ------------- | -------------- |
-| Language       | Rust + Python | C + Python     | Cython        | C + Python     |
-| Performance    | ⭐⭐⭐⭐⭐    | ⭐⭐⭐         | ⭐⭐⭐⭐      | ⭐⭐⭐         |
-| Memory Safety  | ✅ Rust       | ❌ Manual C    | ⚠️ Cython     | ❌ Manual C    |
-| Installation   | 📦 Wheel      | 🔧 Compilation | 📦 Wheel      | 🔧 Compilation |
-| Dependencies   | 🎯 Zero       | 📦 Many        | 📦 Few        | 📦 Many        |
-| API Simplicity | ✅ Simple     | ⚠️ Complex     | ⚠️ Async Only | ⚠️ Complex     |
-
-### Performance Example
-
-```python
-import time
-import PostPyro as pg
-
-conn = pg.Connection("postgresql://user:pass@localhost/db")
-
-# Benchmark: Insert 10,000 records
-start_time = time.time()
-
-queries = []
-for i in range(10000):
-    queries.append(f"INSERT INTO benchmark (value) VALUES ({i})")
-
-conn.execute_batch(queries)
-
-elapsed = time.time() - start_time
-print(f"Inserted 10,000 records in {elapsed:.2f} seconds")
-print(f"Rate: {10000/elapsed:.0f} inserts/second")
-```
+The performance comparisons published for earlier (pre-rewrite, synchronous) versions of PostPyro no longer apply to this async driver and have not been re-benchmarked yet; treat any such numbers you find elsewhere as stale.
 
 ## 🛠️ Advanced Usage
 
-### Connection Pooling Pattern
+### Pooling
+
+`Pool` (from `connect()`) already *is* a connection pool - there's no need to hand-roll one on top of it. Set `max_size`/`min_size` on `connect()` to size it:
 
 ```python
-import PostPyro as pg
-from threading import Lock
-from queue import Queue, Empty
-
-class ConnectionPool:
-    def __init__(self, connection_string, pool_size=5):
-        self.connection_string = connection_string
-        self.pool = Queue(maxsize=pool_size)
-        self.lock = Lock()
-
-        # Initialize pool
-        for _ in range(pool_size):
-            conn = pg.Connection(connection_string)
-            self.pool.put(conn)
-
-    def get_connection(self):
-        try:
-            return self.pool.get(timeout=10)
-        except Empty:
-            raise RuntimeError("No connections available")
-
-    def return_connection(self, conn):
-        if not conn.is_closed():
-            self.pool.put(conn)
-
-    def close_all(self):
-        while not self.pool.empty():
-            try:
-                conn = self.pool.get_nowait()
-                conn.close()
-            except Empty:
-                break
-
-# Usage
-pool = ConnectionPool("postgresql://user:pass@localhost/db")
-
-def process_user(user_id):
-    conn = pool.get_connection()
-    try:
-        user = conn.query_one("SELECT * FROM users WHERE id = $1", [user_id])
-        # Process user...
-        return user
-    finally:
-        pool.return_connection(conn)
+pool = await PostPyro.connect("postgresql://user:pass@localhost/db", max_size=20, min_size=2)
 ```
 
 ### Batch Processing Pattern
 
-```python
-def bulk_insert_users(conn, users_data):
-    """Efficiently insert many users using batch operations"""
+Group related writes in a single transaction rather than issuing them one at a time outside of one:
 
-    # Method 1: Single transaction with multiple inserts
-    with conn.begin() as tx:
+```python
+async def bulk_insert_users(pool: PostPyro.Pool, users_data):
+    """Insert many users inside a single transaction."""
+    tx = await pool.transaction()
+    async with tx:
         for user_data in users_data:
-            tx.execute(
+            await tx.execute(
                 "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
                 [user_data['name'], user_data['email'], user_data['age']]
             )
-
-    # Method 2: Batch execution (faster for large datasets)
-    queries = []
-    for user_data in users_data:
-        queries.append(
-            f"INSERT INTO users (name, email, age) VALUES "
-            f"('{user_data['name']}', '{user_data['email']}', {user_data['age']})"
-        )
-
-    conn.execute_batch(queries)
 ```
 
 ### Error Recovery Pattern
 
 ```python
-import time
-import PostPyro as pg
+import asyncio
+import PostPyro
 
-def robust_query(connection_string, sql, params=None, max_retries=3):
-    """Execute query with automatic retry on connection errors"""
-
+async def robust_query(pool: PostPyro.Pool, sql, params=None, max_retries=3):
+    """Execute a query with automatic retry on operational errors."""
     for attempt in range(max_retries):
         try:
-            conn = pg.Connection(connection_string)
-
-            if not conn.ping():
-                raise pg.OperationalError("Connection failed ping test")
-
-            result = conn.query(sql, params)
-            conn.close()
-            return result
-
-        except (pg.OperationalError, pg.InterfaceError) as e:
+            return await pool.query(sql, params)
+        except (PostPyro.OperationalError, PostPyro.InterfaceError) as e:
             if attempt == max_retries - 1:
                 raise
-
             print(f"Connection error (attempt {attempt + 1}): {e}")
-            time.sleep(2 ** attempt)  # Exponential backoff
-            continue
-
-        except pg.DatabaseError:
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        except PostPyro.DatabaseError:
             # Don't retry on SQL errors
             raise
-
-# Usage
-try:
-    users = robust_query(
-        "postgresql://user:pass@localhost/db",
-        "SELECT * FROM users WHERE active = $1",
-        [True]
-    )
-except pg.DatabaseError as e:
-    print(f"Database error: {e}")
 ```
 
 ## 🌟 Best Practices
 
-### 1. Connection Management
+### 1. Pool Lifecycle
 
 ```python
-# ✅ Good: Use context managers or explicit close
-with pg.Connection("postgresql://...") as conn:
-    result = conn.query("SELECT * FROM users")
-
-# ✅ Good: Explicit cleanup
-conn = pg.Connection("postgresql://...")
+# ✅ Good: one Pool for the app's lifetime, closed on shutdown
+pool = await PostPyro.connect("postgresql://...")
 try:
-    result = conn.query("SELECT * FROM users")
+    result = await pool.query("SELECT * FROM users")
 finally:
-    conn.close()
+    await pool.close()
 
-# ❌ Bad: No cleanup
-conn = pg.Connection("postgresql://...")
-result = conn.query("SELECT * FROM users")  # Connection leaks
+# ❌ Bad: opening a new pool per request/call
+async def handler():
+    pool = await PostPyro.connect("postgresql://...")  # expensive, leaks connections
+    return await pool.query("SELECT * FROM users")
 ```
 
 ### 2. Parameter Binding
 
 ```python
-# ✅ Good: Always use parameters
+# ✅ Good: always use parameters
 user_id = 123
-conn.query("SELECT * FROM users WHERE id = $1", [user_id])
+await pool.query("SELECT * FROM users WHERE id = $1", [user_id])
 
-# ❌ Bad: String formatting (SQL injection risk)
-conn.query(f"SELECT * FROM users WHERE id = {user_id}")
+# ❌ Bad: string formatting (SQL injection risk)
+await pool.query(f"SELECT * FROM users WHERE id = {user_id}")
 ```
 
 ### 3. Transaction Usage
 
 ```python
-# ✅ Good: Use transactions for multiple operations
-with conn.begin() as tx:
-    tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])
-    tx.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [100, 2])
+# ✅ Good: use a transaction for multiple related operations
+tx = await pool.transaction()
+async with tx:
+    await tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])
+    await tx.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [100, 2])
 
-# ❌ Bad: Multiple separate operations
-conn.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])
-conn.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [100, 2])
+# ❌ Bad: separate un-transacted operations that should be atomic
+await pool.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])
+await pool.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [100, 2])
 ```
 
 ### 4. Error Handling
 
 ```python
-# ✅ Good: Specific error handling
+# ✅ Good: specific error handling
 try:
-    conn.execute("INSERT INTO users (email) VALUES ($1)", [email])
-except pg.IntegrityError:
+    await pool.execute("INSERT INTO users (email) VALUES ($1)", [email])
+except PostPyro.IntegrityError:
     print("Email already exists")
-except pg.ProgrammingError:
+except PostPyro.ProgrammingError:
     print("SQL syntax error")
 
-# ❌ Bad: Generic error handling
+# ❌ Bad: generic error handling
 try:
-    conn.execute("INSERT INTO users (email) VALUES ($1)", [email])
+    await pool.execute("INSERT INTO users (email) VALUES ($1)", [email])
 except Exception as e:
     print(f"Something went wrong: {e}")
 ```
 
 ## 📊 Performance Tips
 
-1. **Use batch operations** for multiple inserts/updates
-2. **Prepare statements** for repeated queries
-3. **Use transactions** to group related operations
-4. **Close connections** explicitly to free resources
-5. **Use connection pooling** in multi-threaded applications
-6. **Leverage Row.to_dict()** for pandas integration
-7. **Use query_one()** when expecting single results
+1. **Use transactions** to group related operations
+2. **Size the pool** (`max_size`/`min_size` on `connect()`) to your workload's concurrency
+3. **Close the pool** on shutdown to free connections
+4. **Leverage `Row.to_dict()`** for pandas integration
+5. **Use `query_one()`** when expecting a single result
 
 ## 🔧 Configuration
 
@@ -779,21 +593,21 @@ except Exception as e:
 
 ```python
 # Basic connection
-conn = pg.Connection("postgresql://user:pass@localhost:5432/database")
+pool = await PostPyro.connect("postgresql://user:pass@localhost:5432/database")
 
 # With SSL
-conn = pg.Connection("postgresql://user:pass@host/db?sslmode=require")
+pool = await PostPyro.connect("postgresql://user:pass@host/db?sslmode=require")
 
 # With connection timeout
-conn = pg.Connection("postgresql://user:pass@host/db?connect_timeout=10")
+pool = await PostPyro.connect("postgresql://user:pass@host/db?connect_timeout=10")
 
-# Multiple parameters
-conn = pg.Connection("postgresql://user:pass@host/db?sslmode=require&connect_timeout=10&application_name=myapp")
+# Pool sizing
+pool = await PostPyro.connect("postgresql://user:pass@host/db", max_size=20, min_size=2)
 ```
 
 ## 🆚 Migration from Other Drivers
 
-### From psycopg2
+### From psycopg2 (sync)
 
 ```python
 # psycopg2
@@ -805,68 +619,57 @@ rows = cur.fetchall()
 conn.close()
 
 # PostPyro
-import PostPyro as pg
-conn = pg.Connection("postgresql://postgres@localhost/test")
-rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
-conn.close()
+import PostPyro
+pool = await PostPyro.connect("postgresql://postgres@localhost/test")
+rows = await pool.query("SELECT * FROM users WHERE id = $1", [123])
+await pool.close()
 ```
 
 ### From asyncpg
 
+Both drivers are async; the shapes are close, with `execute`/`query`/`query_one` in place of asyncpg's `execute`/`fetch`/`fetchrow`.
+
 ```python
-# asyncpg (async)
+# asyncpg
 import asyncpg
 conn = await asyncpg.connect("postgresql://postgres@localhost/test")
 rows = await conn.fetch("SELECT * FROM users WHERE id = $1", 123)
 await conn.close()
 
-# PostPyro (sync, but faster due to Rust)
-import PostPyro as pg
-conn = pg.Connection("postgresql://postgres@localhost/test")
-rows = conn.query("SELECT * FROM users WHERE id = $1", [123])
-conn.close()
+# PostPyro
+import PostPyro
+pool = await PostPyro.connect("postgresql://postgres@localhost/test")
+rows = await pool.query("SELECT * FROM users WHERE id = $1", [123])
+await pool.close()
 ```
 
 ## 🐛 Troubleshooting
 
-### Common Issues
+**Connection refused / authentication failed**
 
-**Connection refused**
-
-```python
-# Check if PostgreSQL is running
-if not conn.ping():
-    print("PostgreSQL server is not responding")
-```
-
-**Authentication failed**
+`connect()` raises a `PostPyro.OperationalError` (or subclass) if it can't establish the pool - catch it around the `await`:
 
 ```python
 try:
-    conn = pg.Connection("postgresql://user:wrongpass@localhost/db")
-except pg.OperationalError as e:
-    print(f"Authentication error: {e}")
+    pool = await PostPyro.connect("postgresql://user:wrongpass@localhost/db")
+except PostPyro.OperationalError as e:
+    print(f"Connection error: {e}")
 ```
 
 **Type conversion errors**
 
 ```python
 # Use proper Python types
-conn.execute("INSERT INTO users (age) VALUES ($1)", [25])  # ✅ int
-conn.execute("INSERT INTO users (age) VALUES ($1)", ["25"])  # ❌ string
+await pool.execute("INSERT INTO users (age) VALUES ($1)", [25])    # ✅ int
+await pool.execute("INSERT INTO users (age) VALUES ($1)", ["25"])  # ❌ string
 ```
 
-## 🎯 Conclusion
+## 🎯 Summary
 
-PostPyro provides the perfect balance of **performance**, **safety**, and **simplicity**:
-
-- **🚀 Faster than psycopg2** thanks to Rust implementation
-- **🛡️ Safer than C-based drivers** with Rust's memory safety
-- **🎯 Simpler than asyncpg** with synchronous interface
-- **📦 Easier to install** with pre-built wheels
-- **🌊 More efficient** with zero-copy operations
-
-**Start using PostPyro today for your PostgreSQL projects!**
+- **🚀 Fast**: Rust + `sqlx` binary protocol
+- **⚡ Fully async**: releases the GIL during I/O
+- **🛡️ Memory safe**: Rust's ownership system
+- **📦 Easy to install**: pre-built wheels, no system dependencies
 
 ```bash
 pip install PostPyro
@@ -874,6 +677,6 @@ pip install PostPyro
 
 ---
 
-**Built with ❤️ using Rust, PyO3, and tokio-postgres**
+**Built with ❤️ using Rust, PyO3, and sqlx**
 
 For more examples and advanced usage, visit our [GitHub repository](https://github.com/magi8101/PostPyro).
