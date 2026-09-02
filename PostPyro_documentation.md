@@ -332,22 +332,23 @@ PostPyro automatically converts between Python and PostgreSQL types.
 
 ### Supported Type Conversions
 
-| PostgreSQL Type            | Python Type         | Example                                        |
-| --------------------------- | -------------------- | ------------------------------------------------ |
-| `BOOLEAN`                  | `bool`              | `True`, `False`                                |
-| `SMALLINT`, `INTEGER`      | `int`               | `42`, `-123`                                   |
-| `BIGINT`                   | `int`               | `9223372036854775807`                          |
-| `REAL`, `DOUBLE PRECISION` | `float`             | `3.14`, `2.718`                                |
-| `TEXT`, `VARCHAR`          | `str`               | `"Hello World"`                                |
-| `BYTEA`                    | `bytes`             | `b"binary data"`                               |
-| `DATE`                     | `datetime.date`     | `date(2023, 12, 25)`                           |
-| `TIME`                     | `datetime.time`     | `time(14, 30, 0)`                              |
-| `TIMESTAMP`                | `datetime.datetime` | `datetime(2023, 12, 25, 14, 30)`               |
-| `TIMESTAMPTZ`              | `datetime.datetime` | With timezone info                             |
-| `UUID`                     | `uuid.UUID`         | `UUID('550e8400-e29b-41d4-a716-446655440000')` |
-| `JSON`, `JSONB`            | `dict`, `list`      | `{"key": "value"}`, `[1, 2, 3]`                |
-| `ARRAY`                    | `list`              | `[1, 2, 3]`, `["a", "b", "c"]`                 |
-| `INET`, `CIDR`             | `str`               | `"192.168.1.1"`, `"192.168.0.0/24"`            |
+| PostgreSQL Type                       | Python Type          | Example                                        |
+| -------------------------------------- | --------------------- | ------------------------------------------------- |
+| `BOOLEAN`                             | `bool`               | `True`, `False`                                |
+| `SMALLINT`, `INTEGER`, `BIGINT`       | `int`                | `42`, `-123`, `9223372036854775807`            |
+| `REAL`, `DOUBLE PRECISION`            | `float`               | `3.14`, `2.718`                                |
+| `NUMERIC`                             | `decimal.Decimal`     | `Decimal('1234.5678')`                         |
+| `TEXT`, `VARCHAR`, `CHAR`, `NAME`     | `str`                 | `"Hello World"`                                |
+| `DATE`                                | `datetime.date`       | `date(2023, 12, 25)`                           |
+| `TIME`                                | `datetime.time`       | `time(14, 30, 0)`                              |
+| `TIMESTAMP`                           | `datetime.datetime`   | `datetime(2023, 12, 25, 14, 30)`               |
+| `TIMESTAMPTZ`                         | `datetime.datetime`   | With timezone info (UTC)                       |
+| `UUID`                                | `str`                 | `'550e8400-e29b-41d4-a716-446655440000'`       |
+| `JSON`, `JSONB`                       | `dict`, `list`, etc.  | `{"key": "value"}`, `[1, 2, 3]`                |
+
+Any other type (`BYTEA`, arrays, `INET`/`CIDR`, custom/enum types, etc.) isn't
+decodable yet - reading such a column raises `PostPyro.NotSupportedError`
+naming the type, rather than silently returning the wrong value or `None`.
 
 ### Type Usage Example
 

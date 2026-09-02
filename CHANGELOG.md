@@ -15,6 +15,9 @@ All notable changes to PostPyro will be documented in this file.
 - `Row` column-name access (`row["column"]`) now looks up the actual column instead of always returning column 0.
 - Float parameters no longer lose precision to a forced `f32` downcast before binding.
 - `Row.keys()`/`values()`/`items()`/`to_dict()`/`get()`/`__iter__`/`__repr__` are implemented (previously documented but missing).
+- Binding a plain `None` into a non-text column (e.g. `INT4`, `FLOAT8`) no longer raises a Postgres type-mismatch error - it's now bound as an untyped NULL and Postgres infers the real column type, the same way `NULL` binds in other drivers.
+- Reading a column of a type the driver doesn't yet decode (e.g. `BYTEA`, arrays) now raises `NotSupportedError` naming the type, instead of silently returning `None` as if the value were a real SQL NULL.
+- `NUMERIC` columns decode to `decimal.Decimal` with full precision (previously fell into the same silent-`None` bug above).
 
 ### Added
 
