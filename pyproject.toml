@@ -15,9 +15,9 @@ authors = [
 maintainers = [
     {name = "Magi Sharma J", email = "sharmamagi0@gmail.com"},
 ]
-keywords = ["postgresql", "database", "driver", "rust", "performance", "binary-protocol", "prepared-statements", "thread-safe"]
+keywords = ["postgresql", "database", "driver", "rust", "async", "asyncio", "sqlx", "pyo3"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "License :: OSI Approved :: Apache Software License",
@@ -29,6 +29,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Rust",
+    "Framework :: AsyncIO",
     "Topic :: Database",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
