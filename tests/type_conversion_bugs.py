@@ -37,7 +37,8 @@ async def main():
             tstz TIMESTAMPTZ,
             d DATE,
             t TIME,
-            j JSONB
+            j JSONB,
+            big_num NUMERIC
         )
         """
     )
@@ -122,9 +123,35 @@ async def main():
     await pool.execute("UPDATE type_conversion_bugs_test SET pt = '(1,2)' WHERE id = 3")
     try:
         await pool.query_one("SELECT pt FROM type_conversion_bugs_test WHERE id = 3")
-        assert False, "expected NotSupportedError for an unhandled Postgres type"
+        # `assert False` is stripped entirely under `python -O`, silently
+        # defeating this check - raise unconditionally instead.
+        raise AssertionError("expected NotSupportedError for an unhandled Postgres type")
     except PostPyro.NotSupportedError:
         pass
+
+    # === NUMERIC beyond rust_decimal's ~28-29 significant digit limit -
+    # bigdecimal::BigDecimal (arbitrary precision) must round-trip exactly ===
+    big_num_str = "123456789012345678901234567890.123456789"  # 39 significant digits
+    await pool.execute(
+        "INSERT INTO type_conversion_bugs_test (id, big_num) VALUES ($1, $2::numeric)",
+        [4, big_num_str],
+    )
+    row4 = await pool.query_one("SELECT big_num FROM type_conversion_bugs_test WHERE id = 4")
+    big_num = row4["big_num"]
+    assert isinstance(big_num, decimal.Decimal), f"expected Decimal, got {type(big_num)}: {big_num!r}"
+    assert big_num == decimal.Decimal(big_num_str), big_num
+
+    # === JSON integer above i64::MAX but within u64 must not lose precision
+    # by falling through to a lossy f64 ===
+    u64_max = 18446744073709551615  # u64::MAX, > i64::MAX
+    await pool.execute(
+        "INSERT INTO type_conversion_bugs_test (id, j) VALUES ($1, $2::jsonb)",
+        [5, f'{{"big": {u64_max}}}'],
+    )
+    row5 = await pool.query_one("SELECT j FROM type_conversion_bugs_test WHERE id = 5")
+    j5 = row5["j"]
+    assert isinstance(j5["big"], int), f"expected int, got {type(j5['big'])}: {j5['big']!r}"
+    assert j5["big"] == u64_max, j5["big"]
 
     await pool.execute("DROP TABLE type_conversion_bugs_test")
     await pool.close()

@@ -27,9 +27,9 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 once_cell = "1"
 hex = "0.4"
-sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "json", "rust_decimal"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "json", "bigdecimal"] }
 pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
-rust_decimal = "1"
+bigdecimal = "0.4"
 
 # High-performance optimization crates
 smallvec = { version = "1.13", features = ["const_generics", "write", "union"] }
