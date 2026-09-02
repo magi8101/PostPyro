@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PostPyro - High-Performance PostgreSQL Driver for Python</title>
+    <title>PostPyro - Async PostgreSQL Driver for Python</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@
             <div class="nav-brand">
                 <span class="logo">🔥</span>
                 <span class="brand-name">PostPyro</span>
-                <span class="version">v0.1.2</span>
+                <span class="version">v2.0.0-dev</span>
             </div>
             <ul class="nav-menu">
                 <li><a href="#overview" class="nav-link">Overview</a></li>
@@ -52,12 +52,12 @@
                         <span class="gradient-text">PostPyro</span>
                     </h1>
                     <p class="hero-subtitle">
-                        High-Performance PostgreSQL Driver for Python Built with Rust
+                        Async PostgreSQL Driver for Python, Built with Rust
                     </p>
                     <p class="hero-description">
-                        PostPyro combines the safety and performance of Rust with the simplicity of Python. 
-                        Built with PyO3 and tokio-postgres, it provides DB-API 2.0 compliance while delivering 
-                        superior performance through native Rust implementation.
+                        Built with PyO3 and sqlx, PostPyro is a fully async driver - every I/O method is
+                        <code>async def</code> and releases the GIL while waiting on Postgres - with
+                        DB-API 2.0-flavored exception handling.
                     </p>
                     <div class="hero-actions">
                         <a href="#installation" class="btn btn-primary">Get Started</a>
@@ -98,28 +98,33 @@
                             <span class="code-title">quick_example.py</span>
                         </div>
                         <div class="code-content">
-                            <pre><code class="language-python">import PostPyro as pg
+                            <pre><code class="language-python">import asyncio
+import PostPyro
 
-# Connect to PostgreSQL
-conn = pg.Connection("postgresql://user:pass@localhost/db")
+async def main():
+    # Connect to PostgreSQL (returns a Pool)
+    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
 
-# Query data
-users = conn.query("SELECT * FROM users WHERE active = $1", [True])
-for user in users:
-    print(f"User: {user['name']} ({user['email']})")
+    # Query data
+    users = await pool.query("SELECT * FROM users WHERE active = $1", [True])
+    for user in users:
+        print(f"User: {user['name']} ({user['email']})")
 
-# Execute updates
-affected = conn.execute(
-    "UPDATE users SET last_login = NOW() WHERE id = $1", 
-    [user_id]
-)
+    # Execute updates
+    affected = await pool.execute(
+        "UPDATE users SET last_login = NOW() WHERE id = $1",
+        [user_id]
+    )
 
-# Use transactions
-with conn.begin() as tx:
-    tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [user_id])
-    tx.execute("UPDATE inventory SET stock = stock - 1")
+    # Use transactions
+    tx = await pool.transaction()
+    async with tx:
+        await tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [user_id])
+        await tx.execute("UPDATE inventory SET stock = stock - 1")
 
-conn.close()</code></pre>
+    await pool.close()
+
+asyncio.run(main())</code></pre>
                         </div>
                     </div>
                 </div>
@@ -133,37 +138,42 @@ conn.close()</code></pre>
                 <div class="features-grid">
                     <div class="feature-card">
                         <div class="feature-icon">🔥</div>
-                        <h3 class="feature-title">High Performance</h3>
+                        <h3 class="feature-title">Rust Core</h3>
                         <p class="feature-description">
-                            Rust-powered backend with zero-copy data handling for maximum speed and efficiency.
+                            The driver itself is a PyO3 extension module - query execution and type
+                            conversion happen in compiled Rust, not interpreted Python.
                         </p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🛡️</div>
                         <h3 class="feature-title">Memory Safe</h3>
                         <p class="feature-description">
-                            Rust's ownership system prevents memory leaks and segfaults, ensuring reliability.
+                            Rust's ownership system prevents memory leaks and segfaults.
                         </p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🌐</div>
-                        <h3 class="feature-title">Full PostgreSQL Support</h3>
+                        <h3 class="feature-title">Broad Type Support</h3>
                         <p class="feature-description">
-                            Complete support for all PostgreSQL data types, arrays, JSON, UUIDs, and network types.
+                            Booleans, integers, floats, numeric, text, dates/times, UUIDs, and JSON/JSONB
+                            convert automatically. See the Type System reference below for the full list.
                         </p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">⚡</div>
-                        <h3 class="feature-title">Tokio Async I/O</h3>
+                        <h3 class="feature-title">Fully Async</h3>
                         <p class="feature-description">
-                            Native async I/O under the hood powered by tokio-postgres for excellent performance.
+                            Every I/O method is <code>async def</code>, built on sqlx's connection pooling
+                            and Tokio runtime, and releases the GIL while waiting on Postgres.
                         </p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🔒</div>
-                        <h3 class="feature-title">Type Safety</h3>
+                        <h3 class="feature-title">Type Conversion</h3>
                         <p class="feature-description">
-                            Comprehensive type checking and automatic conversion between Python and PostgreSQL types.
+                            Postgres values decode to native Python types automatically. Bound parameters other than
+                            <code>bool</code>/<code>int</code>/<code>float</code>/<code>str</code>/<code>None</code> need
+                            an explicit <code>::type</code> cast in the SQL text - see the <a href="#api-types">Type System reference</a> below.
                         </p>
                     </div>
                     <div class="feature-card">
@@ -181,9 +191,18 @@ conn.close()</code></pre>
         <section class="installation" id="installation">
             <div class="container">
                 <h2 class="section-title">Installation</h2>
+                <div class="requirements" style="margin-bottom: var(--space-xl);">
+                    <h4>⚠️ Pre-release</h4>
+                    <p>
+                        This page documents the async 2.0.0-dev API (<code>python/PostPyro/__init__.pyi</code>
+                        in the repo). It hasn't been published to PyPI yet - <code>pip install PostPyro</code>
+                        currently installs the older, synchronous 1.0.0 driver, which does not have this API.
+                        Build from source (below) to use the async driver described here.
+                    </p>
+                </div>
                 <div class="installation-content">
                     <div class="install-method">
-                        <h3 class="install-title">📦 Install from PyPI</h3>
+                        <h3 class="install-title">📦 Install from PyPI (1.0.0, sync - not this API)</h3>
                         <div class="code-block">
                             <pre><code class="language-bash">pip install PostPyro</code></pre>
                             <button class="copy-btn" onclick="copyToClipboard('pip install PostPyro')">
@@ -242,114 +261,121 @@ pip install -e .`)">
                     
                     <div class="tab-content active" id="tab-basic">
                         <div class="code-example">
-                            <pre><code class="language-python">import PostPyro as pg
+                            <pre><code class="language-python">import asyncio
+import PostPyro
 
-# Connect to database
-conn = pg.Connection("postgresql://user:password@localhost:5432/mydb")
+async def main():
+    # Connect to database (returns a Pool)
+    pool = await PostPyro.connect("postgresql://user:password@localhost:5432/mydb")
 
-# Create a table
-conn.execute("""
-    CREATE TABLE users (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE,
-        age INTEGER
+    # Create a table
+    await pool.execute("""
+        CREATE TABLE users (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE,
+            age INTEGER
+        )
+    """)
+
+    # Insert data
+    affected = await pool.execute(
+        "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
+        ["Alice", "alice@example.com", 30]
     )
-""")
+    print(f"Inserted {affected} rows")
 
-# Insert data
-affected = conn.execute(
-    "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
-    ["Alice", "alice@example.com", 30]
-)
-print(f"Inserted {affected} rows")
+    # Close the pool
+    await pool.close()
 
-# Close connection
-conn.close()</code></pre>
+asyncio.run(main())</code></pre>
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-queries">
                         <div class="code-example">
                             <pre><code class="language-python"># Query multiple rows
-users = conn.query("SELECT * FROM users WHERE age > $1", [25])
+users = await pool.query("SELECT * FROM users WHERE age > $1", [25])
 for user in users:
     print(f"ID: {user['id']}, Name: {user['name']}, Age: {user['age']}")
 
-# Query single row
-user = conn.query_one("SELECT * FROM users WHERE id = $1", [1])
+# Query single row (raises ProgrammingError on zero matches;
+# extra matches beyond the first are silently discarded)
+user = await pool.query_one("SELECT * FROM users WHERE id = $1", [1])
 print(f"Found user: {user['name']}")
 
-# Batch operations
-queries = [
-    "INSERT INTO users (name, age) VALUES ('Bob', 25)",
-    "INSERT INTO users (name, age) VALUES ('Charlie', 35)",
-    "INSERT INTO users (name, age) VALUES ('Diana', 28)"
-]
-results = conn.execute_batch(queries)
-print(f"Batch inserted {sum(results)} rows")
+# There's no execute_batch() - run each statement individually
+names_and_ages = [("Bob", 25), ("Charlie", 35), ("Diana", 28)]
+inserted = 0
+for name, age in names_and_ages:
+    inserted += await pool.execute(
+        "INSERT INTO users (name, age) VALUES ($1, $2)", [name, age]
+    )
+print(f"Inserted {inserted} rows")
 
-# Health check
-if conn.ping():
-    print("✅ Connection is healthy")</code></pre>
+# Pool status check
+if not pool.is_closed():
+    print("✅ Pool is open")</code></pre>
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-transactions">
                         <div class="code-example">
-                            <pre><code class="language-python"># Automatic transaction with context manager
-with conn.begin() as tx:
-    tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    tx.execute("UPDATE accounts SET balance = balance + 100 WHERE user_id = $1", [1])
+                            <pre><code class="language-python"># pool.transaction() is a real BEGIN round-trip, so it must be
+# awaited before it can be used as a context manager -
+# `async with pool.transaction():` raises TypeError.
+tx = await pool.transaction()
+async with tx:
+    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
+    await tx.execute("UPDATE accounts SET balance = balance + 100 WHERE user_id = $1", [1])
     # Automatically commits on success, rolls back on exception
 
-# Manual transaction management
-tx = conn.begin()
+# Manual transaction management (commit()/rollback() also
+# work outside a `with` block)
+tx = await pool.transaction()
 try:
-    tx.execute("INSERT INTO orders (user_id, amount) VALUES ($1, $2)", [1, 99.99])
-    tx.execute("UPDATE inventory SET stock = stock - 1 WHERE product_id = $1", [123])
-    tx.commit()
+    await tx.execute("INSERT INTO orders (user_id, amount) VALUES ($1, $2)", [1, 99.99])
+    await tx.execute("UPDATE inventory SET stock = stock - 1 WHERE product_id = $1", [123])
+    await tx.commit()
 except Exception as e:
-    tx.rollback()
+    await tx.rollback()
     print(f"Transaction failed: {e}")
 
-# Query within transaction
-with conn.begin() as tx:
-    users = tx.query("SELECT * FROM users WHERE created_today = true")
+# Query within a transaction
+tx = await pool.transaction()
+async with tx:
+    users = await tx.query("SELECT * FROM users WHERE created_today = true")
     for user in users:
-        tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])</code></pre>
+        await tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])</code></pre>
                         </div>
                     </div>
 
                     <div class="tab-content" id="tab-advanced">
                         <div class="code-example">
-                            <pre><code class="language-python"># Prepared statements for better performance
-stmt_id = conn.prepare("SELECT * FROM users WHERE department = $1")
-
-# Connection info and status
-info = conn.info()
-print(f"Connection closed: {info['closed']}")
-print(f"Connection healthy: {info['healthy']}")
-
-# Working with complex types
-from datetime import datetime, date
+                            <pre><code class="language-python"># bind_params only auto-converts bool/int/float/str/None -
+# anything else (date, datetime, uuid, dict/list for JSON) has
+# to be passed as a string with an explicit Postgres cast.
+import json
 import uuid
+from datetime import date, datetime
 
-conn.execute("""
+await pool.execute("""
     INSERT INTO complex_data (
-        json_col, array_col, uuid_col, date_col, timestamp_col
-    ) VALUES ($1, $2, $3, $4, $5)
+        json_col, uuid_col, date_col, timestamp_col
+    ) VALUES ($1::jsonb, $2::uuid, $3::date, $4::timestamp)
 """, [
-    {"name": "John", "scores": [85, 92, 78]},  # JSON
-    [1, 2, 3, 4, 5],                          # Array
-    uuid.uuid4(),                             # UUID
-    date.today(),                             # Date
-    datetime.now()                            # Timestamp
+    json.dumps({"name": "John", "scores": [85, 92, 78]}),  # JSON
+    str(uuid.uuid4()),                                      # UUID
+    date.today().isoformat(),                               # Date
+    datetime.now().isoformat(),                             # Timestamp
 ])
+
+# Reading back decodes to the right Python type automatically -
+# this direction IS automatic (see the Type System reference below).
 
 # Convert Row to dict for pandas integration
 import pandas as pd
-rows = conn.query("SELECT * FROM users")
+rows = await pool.query("SELECT * FROM users")
 df = pd.DataFrame([row.to_dict() for row in rows])</code></pre>
                         </div>
                     </div>
@@ -365,7 +391,7 @@ df = pd.DataFrame([row.to_dict() for row in rows])</code></pre>
                     <div class="api-sidebar">
                         <ul class="api-menu">
                             <li><a href="#api-module" class="api-link">Module Functions</a></li>
-                            <li><a href="#api-connection" class="api-link">Connection Class</a></li>
+                            <li><a href="#api-connection" class="api-link">Pool Class</a></li>
                             <li><a href="#api-row" class="api-link">Row Class</a></li>
                             <li><a href="#api-transaction" class="api-link">Transaction Class</a></li>
                             <li><a href="#api-errors" class="api-link">Error Handling</a></li>
@@ -378,65 +404,56 @@ df = pd.DataFrame([row.to_dict() for row in rows])</code></pre>
                             
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">pg.connect(connection_string)</code>
+                                    <code class="method-name">await PostPyro.connect(dsn, max_size=10, min_size=0)</code>
                                 </div>
-                                <p class="method-description">Create a new database connection using the connect function.</p>
+                                <p class="method-description">
+                                    Create a connection pool. This is the only way to get a <code>Pool</code> -
+                                    there's no synchronous constructor, since establishing the first connection
+                                    is itself async.
+                                </p>
                                 <div class="method-params">
                                     <h5>Parameters:</h5>
                                     <ul>
-                                        <li><code>connection_string</code> (str): PostgreSQL connection string</li>
+                                        <li><code>dsn</code> (str): PostgreSQL connection string</li>
+                                        <li><code>max_size</code> (int, optional): maximum pool connections (default 10)</li>
+                                        <li><code>min_size</code> (int, optional): minimum pool connections (default 0)</li>
                                     </ul>
                                 </div>
                                 <div class="method-returns">
                                     <h5>Returns:</h5>
-                                    <p><code>Connection</code> object</p>
+                                    <p><code>Pool</code> object</p>
                                 </div>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">conn = pg.connect("postgresql://user:pass@localhost:5432/mydb")</code></pre>
+                                    <pre><code class="language-python">pool = await PostPyro.connect("postgresql://user:pass@localhost:5432/mydb", max_size=20)</code></pre>
                                 </div>
                             </div>
 
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">pg.Connection(connection_string)</code>
+                                    <code class="method-name">PostPyro.__version__ / .apilevel / .threadsafety / .paramstyle</code>
                                 </div>
-                                <p class="method-description">Create a new database connection using the Connection class.</p>
-                                <div class="method-params">
-                                    <h5>Parameters:</h5>
-                                    <ul>
-                                        <li><code>connection_string</code> (str): PostgreSQL connection string</li>
-                                    </ul>
-                                </div>
+                                <p class="method-description">Module-level constants. No <code>get_version()</code> function - read <code>__version__</code> directly.</p>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">conn = pg.Connection("postgresql://user:pass@localhost:5432/mydb")</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">pg.get_version()</code>
-                                </div>
-                                <p class="method-description">Get the PostPyro driver version.</p>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p>Version string (e.g., "0.1.2")</p>
-                                </div>
-                                <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">version = pg.get_version()
-print(f"PostPyro version: {version}")</code></pre>
+                                    <pre><code class="language-python">print(PostPyro.__version__)   # driver version
+print(PostPyro.apilevel)      # "2.0" - DB-API 2.0-flavored
+print(PostPyro.paramstyle)    # "numeric" - uses $1, $2, ... parameters</code></pre>
                                 </div>
                             </div>
                         </div>
 
                         <div class="api-section" id="api-connection">
-                            <h3 class="api-section-title">Connection Class</h3>
-                            
+                            <h3 class="api-section-title">Pool Class</h3>
+                            <p class="section-description">
+                                Obtained via <code>await PostPyro.connect(...)</code>. <code>Pool</code> and the
+                                old <code>ConnectionPool</code> class were unified into this one type - there's
+                                no separate <code>Connection</code> class to construct.
+                            </p>
+
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">conn.execute(query, params=None)</code>
+                                    <code class="method-name">await pool.execute(query, params=None)</code>
                                 </div>
                                 <p class="method-description">Execute INSERT, UPDATE, DELETE, or DDL statements.</p>
                                 <div class="method-params">
@@ -453,19 +470,19 @@ print(f"PostPyro version: {version}")</code></pre>
                                 <div class="method-example">
                                     <h5>Examples:</h5>
                                     <pre><code class="language-python"># INSERT
-affected = conn.execute("INSERT INTO users (name, age) VALUES ($1, $2)", ["Alice", 30])
+affected = await pool.execute("INSERT INTO users (name, age) VALUES ($1, $2)", ["Alice", 30])
 
-# UPDATE  
-affected = conn.execute("UPDATE users SET age = $1 WHERE name = $2", [31, "Alice"])
+# UPDATE
+affected = await pool.execute("UPDATE users SET age = $1 WHERE name = $2", [31, "Alice"])
 
 # DELETE
-affected = conn.execute("DELETE FROM users WHERE age < $1", [18])</code></pre>
+affected = await pool.execute("DELETE FROM users WHERE age < $1", [18])</code></pre>
                                 </div>
                             </div>
 
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">conn.query(query, params=None)</code>
+                                    <code class="method-name">await pool.query(query, params=None)</code>
                                 </div>
                                 <p class="method-description">Execute SELECT queries and return all matching rows.</p>
                                 <div class="method-params">
@@ -481,7 +498,7 @@ affected = conn.execute("DELETE FROM users WHERE age < $1", [18])</code></pre>
                                 </div>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">rows = conn.query("SELECT id, name, age FROM users WHERE age > $1", [25])
+                                    <pre><code class="language-python">rows = await pool.query("SELECT id, name, age FROM users WHERE age > $1", [25])
 for row in rows:
     print(f"ID: {row['id']}, Name: {row['name']}, Age: {row['age']}")</code></pre>
                                 </div>
@@ -489,9 +506,9 @@ for row in rows:
 
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">conn.query_one(query, params=None)</code>
+                                    <code class="method-name">await pool.query_one(query, params=None)</code>
                                 </div>
-                                <p class="method-description">Execute SELECT query and return exactly one row.</p>
+                                <p class="method-description">Execute a SELECT and return its first row.</p>
                                 <div class="method-params">
                                     <h5>Parameters:</h5>
                                     <ul>
@@ -505,30 +522,68 @@ for row in rows:
                                 </div>
                                 <div class="method-raises">
                                     <h5>Raises:</h5>
-                                    <p>Error if zero or multiple rows returned</p>
+                                    <p>
+                                        <code>ProgrammingError</code> if zero rows are returned. If more than one
+                                        row matches, the extras are silently discarded rather than raising - only
+                                        use this when your query itself guarantees at most one row (a primary-key
+                                        lookup, <code>LIMIT 1</code>, etc.).
+                                    </p>
                                 </div>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">user = conn.query_one("SELECT * FROM users WHERE id = $1", [1])
+                                    <pre><code class="language-python">user = await pool.query_one("SELECT * FROM users WHERE id = $1", [1])
 print(f"User name: {user['name']}")</code></pre>
                                 </div>
                             </div>
 
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">conn.begin()</code>
+                                    <code class="method-name">await pool.transaction()</code>
                                 </div>
-                                <p class="method-description">Begin a new transaction and return a Transaction object.</p>
+                                <p class="method-description">
+                                    Start a new transaction (a real <code>BEGIN</code>). Await it, then use the
+                                    result as an <code>async with</code> block -
+                                    <code>async with pool.transaction():</code> raises <code>TypeError</code>
+                                    because the un-awaited coroutine has no <code>__aenter__</code>.
+                                </p>
                                 <div class="method-returns">
                                     <h5>Returns:</h5>
-                                    <p><code>Transaction</code> object (context manager)</p>
+                                    <p><code>Transaction</code> object (async context manager)</p>
                                 </div>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">with conn.begin() as tx:
-    tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    tx.execute("UPDATE accounts SET balance = balance - 100 WHERE user_id = $1", [1])
+                                    <pre><code class="language-python">tx = await pool.transaction()
+async with tx:
+    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
+    await tx.execute("UPDATE accounts SET balance = balance - 100 WHERE user_id = $1", [1])
     # Automatically commits on success, rolls back on exception</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="api-method">
+                                <div class="method-signature">
+                                    <code class="method-name">await pool.close()</code>
+                                </div>
+                                <p class="method-description">Close the pool and free its connections.</p>
+                                <div class="method-example">
+                                    <h5>Example:</h5>
+                                    <pre><code class="language-python">await pool.close()</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="api-method">
+                                <div class="method-signature">
+                                    <code class="method-name">pool.is_closed()</code>
+                                </div>
+                                <p class="method-description">Check whether the pool has been closed. Synchronous - no <code>await</code>.</p>
+                                <div class="method-returns">
+                                    <h5>Returns:</h5>
+                                    <p><code>bool</code></p>
+                                </div>
+                                <div class="method-example">
+                                    <h5>Example:</h5>
+                                    <pre><code class="language-python">if not pool.is_closed():
+    await pool.query("SELECT 1")</code></pre>
                                 </div>
                             </div>
                         </div>
@@ -541,18 +596,19 @@ print(f"User name: {user['name']}")</code></pre>
                                 <div class="method-signature">
                                     <code class="method-name">row[key]</code>
                                 </div>
-                                <p class="method-description">Access column values by index or name.</p>
+                                <p class="method-description">Access column values by index or name. Negative indices (<code>row[-1]</code>) work like a Python list.</p>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">row = conn.query_one("SELECT id, name, email FROM users WHERE id = $1", [1])
+                                    <pre><code class="language-python">row = await pool.query_one("SELECT id, name, email FROM users WHERE id = $1", [1])
 
 # Access by column name
 print(row['name'])
 print(row['email'])
 
-# Access by index  
-print(row[0])  # id
-print(row[1])  # name</code></pre>
+# Access by index
+print(row[0])   # id
+print(row[1])   # name
+print(row[-1])  # last column</code></pre>
                                 </div>
                             </div>
 
@@ -575,39 +631,66 @@ print(user_dict)  # {'id': 1, 'name': 'Alice', 'email': 'alice@example.com'}</co
 
                         <div class="api-section" id="api-transaction">
                             <h3 class="api-section-title">Transaction Class</h3>
-                            <p class="section-description">Represents a database transaction with automatic rollback on errors.</p>
-                            
+                            <p class="section-description">
+                                Obtained via <code>await pool.transaction()</code>. Using a transaction after
+                                it has been committed or rolled back raises <code>ProgrammingError</code>
+                                rather than hanging or panicking.
+                            </p>
+
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">tx.execute(query, params=None)</code>
+                                    <code class="method-name">await tx.execute(query, params=None)</code>
                                 </div>
                                 <p class="method-description">Execute a statement within the transaction.</p>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">with conn.begin() as tx:
-    tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])</code></pre>
+                                    <pre><code class="language-python">tx = await pool.transaction()
+async with tx:
+    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
+    await tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])</code></pre>
                                 </div>
                             </div>
 
                             <div class="api-method">
                                 <div class="method-signature">
-                                    <code class="method-name">tx.query(query, params=None)</code>
+                                    <code class="method-name">await tx.query(query, params=None) / await tx.query_one(query, params=None)</code>
                                 </div>
-                                <p class="method-description">Execute a query within the transaction.</p>
+                                <p class="method-description">Execute a query within the transaction. Same semantics as <code>pool.query</code>/<code>pool.query_one</code>.</p>
                                 <div class="method-example">
                                     <h5>Example:</h5>
-                                    <pre><code class="language-python">with conn.begin() as tx:
-    users = tx.query("SELECT * FROM users WHERE created_today = true")
+                                    <pre><code class="language-python">tx = await pool.transaction()
+async with tx:
+    users = await tx.query("SELECT * FROM users WHERE created_today = true")
     for user in users:
-        tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])</code></pre>
+        await tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="api-method">
+                                <div class="method-signature">
+                                    <code class="method-name">await tx.commit() / await tx.rollback() / tx.is_active()</code>
+                                </div>
+                                <p class="method-description">
+                                    Explicit commit/rollback - also work outside a <code>with</code> block.
+                                    <code>is_active()</code> is synchronous and returns <code>False</code> after
+                                    commit/rollback.
+                                </p>
+                                <div class="method-example">
+                                    <h5>Example:</h5>
+                                    <pre><code class="language-python">tx = await pool.transaction()
+try:
+    await tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [1])
+    await tx.commit()
+except Exception:
+    await tx.rollback()
+print(tx.is_active())  # False</code></pre>
                                 </div>
                             </div>
                         </div>
 
                         <div class="api-section" id="api-errors">
                             <h3 class="api-section-title">Error Handling</h3>
-                            <p class="section-description">PostPyro provides comprehensive PostgreSQL error mapping with specific exception types.</p>
+                            <p class="section-description">PostPyro maps <code>sqlx</code>/Postgres errors onto a DB-API 2.0-flavored exception hierarchy, so you can catch by class instead of parsing SQLSTATE codes yourself.</p>
                             
                             <div class="error-hierarchy">
                                 <h4>Exception Hierarchy</h4>
@@ -623,23 +706,24 @@ print(user_dict)  # {'id': 1, 'name': 'Alice', 'email': 'alice@example.com'}</co
 
                             <div class="method-example">
                                 <h5>Error Handling Example:</h5>
-                                <pre><code class="language-python">import PostPyro as pg
+                                <pre><code class="language-python">import PostPyro
 
-try:
-    conn = pg.Connection("postgresql://user:pass@localhost/db")
-    conn.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
-    
-except pg.IntegrityError as e:
-    print(f"Constraint violation: {e}")
-    
-except pg.OperationalError as e:
-    print(f"Database operation failed: {e}")
-    
-except pg.ProgrammingError as e:
-    print(f"SQL syntax error: {e}")
-    
-except pg.DatabaseError as e:
-    print(f"General database error: {e}")</code></pre>
+async def main():
+    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
+    try:
+        await pool.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
+
+    except PostPyro.IntegrityError as e:
+        print(f"Constraint violation: {e}")
+
+    except PostPyro.OperationalError as e:
+        print(f"Database operation failed: {e}")
+
+    except PostPyro.ProgrammingError as e:
+        print(f"SQL syntax error: {e}")
+
+    except PostPyro.DatabaseError as e:
+        print(f"General database error: {e}")</code></pre>
                             </div>
                         </div>
 
@@ -663,24 +747,24 @@ except pg.DatabaseError as e:
                                             <td><code>True</code>, <code>False</code></td>
                                         </tr>
                                         <tr>
-                                            <td><code>INTEGER</code></td>
+                                            <td><code>SMALLINT</code>, <code>INTEGER</code>, <code>BIGINT</code></td>
                                             <td><code>int</code></td>
-                                            <td><code>42</code>, <code>-123</code></td>
+                                            <td><code>42</code>, <code>-123</code>, <code>9223372036854775807</code></td>
                                         </tr>
                                         <tr>
-                                            <td><code>REAL</code></td>
+                                            <td><code>REAL</code>, <code>DOUBLE PRECISION</code></td>
                                             <td><code>float</code></td>
                                             <td><code>3.14</code>, <code>2.718</code></td>
                                         </tr>
                                         <tr>
-                                            <td><code>TEXT</code></td>
-                                            <td><code>str</code></td>
-                                            <td><code>"Hello World"</code></td>
+                                            <td><code>NUMERIC</code></td>
+                                            <td><code>decimal.Decimal</code></td>
+                                            <td><code>Decimal('1234.5678')</code></td>
                                         </tr>
                                         <tr>
-                                            <td><code>BYTEA</code></td>
-                                            <td><code>bytes</code></td>
-                                            <td><code>b"binary data"</code></td>
+                                            <td><code>TEXT</code>, <code>VARCHAR</code>, <code>CHAR</code>, <code>NAME</code></td>
+                                            <td><code>str</code></td>
+                                            <td><code>"Hello World"</code></td>
                                         </tr>
                                         <tr>
                                             <td><code>DATE</code></td>
@@ -688,28 +772,39 @@ except pg.DatabaseError as e:
                                             <td><code>date(2023, 12, 25)</code></td>
                                         </tr>
                                         <tr>
+                                            <td><code>TIME</code></td>
+                                            <td><code>datetime.time</code></td>
+                                            <td><code>time(14, 30, 0)</code></td>
+                                        </tr>
+                                        <tr>
                                             <td><code>TIMESTAMP</code></td>
                                             <td><code>datetime.datetime</code></td>
                                             <td><code>datetime(2023, 12, 25, 14, 30)</code></td>
                                         </tr>
                                         <tr>
+                                            <td><code>TIMESTAMPTZ</code></td>
+                                            <td><code>datetime.datetime</code></td>
+                                            <td>With timezone info (UTC)</td>
+                                        </tr>
+                                        <tr>
                                             <td><code>UUID</code></td>
-                                            <td><code>uuid.UUID</code></td>
-                                            <td><code>uuid.uuid4()</code></td>
+                                            <td><code>str</code></td>
+                                            <td><code>'550e8400-e29b-...'</code></td>
                                         </tr>
                                         <tr>
-                                            <td><code>JSON</code></td>
-                                            <td><code>dict</code>, <code>list</code></td>
-                                            <td><code>{"key": "value"}</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>ARRAY</code></td>
-                                            <td><code>list</code></td>
-                                            <td><code>[1, 2, 3]</code></td>
+                                            <td><code>JSON</code>, <code>JSONB</code></td>
+                                            <td><code>dict</code>, <code>list</code>, etc.</td>
+                                            <td><code>{"key": "value"}</code>, <code>[1, 2, 3]</code></td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
+                            <p class="section-description">
+                                Any other type (<code>BYTEA</code>, arrays, <code>INET</code>/<code>CIDR</code>,
+                                custom/enum types, etc.) isn't decodable yet - reading such a column raises
+                                <code>PostPyro.NotSupportedError</code> naming the type, rather than silently
+                                returning the wrong value or <code>None</code>.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -724,16 +819,21 @@ except pg.DatabaseError as e:
                     <div class="example-card">
                         <h3 class="example-title">🐼 Pandas Integration</h3>
                         <div class="example-code">
-                            <pre><code class="language-python">import pandas as pd
-import PostPyro as pg
+                            <pre><code class="language-python">import asyncio
+import pandas as pd
+import PostPyro
 
-conn = pg.Connection("postgresql://user:pass@localhost/db")
+async def main():
+    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
 
-# Query to DataFrame
-rows = conn.query("SELECT * FROM sales_data")
-df = pd.DataFrame([row.to_dict() for row in rows])
+    # Query to DataFrame
+    rows = await pool.query("SELECT * FROM sales_data")
+    df = pd.DataFrame([row.to_dict() for row in rows])
 
-print(df.head())</code></pre>
+    print(df.head())
+    await pool.close()
+
+asyncio.run(main())</code></pre>
                         </div>
                     </div>
 
@@ -741,69 +841,75 @@ print(df.head())</code></pre>
                         <h3 class="example-title">🚀 FastAPI Integration</h3>
                         <div class="example-code">
                             <pre><code class="language-python">from fastapi import FastAPI, HTTPException
-import PostPyro as pg
+import PostPyro
 
 app = FastAPI()
-conn = pg.Connection("postgresql://user:pass@localhost/db")
+
+@app.on_event("startup")
+async def startup():
+    app.state.pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
 
 @app.get("/users/{user_id}")
 async def get_user(user_id: int):
     try:
-        user = conn.query_one(
-            "SELECT id, name, email FROM users WHERE id = $1", 
+        user = await app.state.pool.query_one(
+            "SELECT id, name, email FROM users WHERE id = $1",
             [user_id]
         )
         return user.to_dict()
-    except pg.DatabaseError:
+    except PostPyro.DatabaseError:
         raise HTTPException(status_code=404, detail="User not found")</code></pre>
                         </div>
                     </div>
 
                     <div class="example-card">
-                        <h3 class="example-title">🔧 Connection Pool Pattern</h3>
+                        <h3 class="example-title">🔧 Pooling Is Built In</h3>
                         <div class="example-code">
-                            <pre><code class="language-python">import PostPyro as pg
-from queue import Queue
+                            <pre><code class="language-python">import asyncio
+import PostPyro
 
-class ConnectionPool:
-    def __init__(self, connection_string, pool_size=5):
-        self.pool = Queue(maxsize=pool_size)
-        
-        # Initialize pool
-        for _ in range(pool_size):
-            conn = pg.Connection(connection_string)
-            self.pool.put(conn)
-    
-    def get_connection(self):
-        return self.pool.get(timeout=10)
-    
-    def return_connection(self, conn):
-        if not conn.is_closed():
-            self.pool.put(conn)</code></pre>
+async def main():
+    # Pool is already a connection pool - no wrapper class needed.
+    # max_size/min_size configure how many connections it keeps.
+    pool = await PostPyro.connect(
+        "postgresql://user:pass@localhost/db",
+        max_size=20,
+        min_size=2,
+    )
+
+    # Concurrent queries share the pool automatically
+    results = await asyncio.gather(
+        pool.query("SELECT * FROM users WHERE id = $1", [1]),
+        pool.query("SELECT * FROM users WHERE id = $1", [2]),
+    )
+
+    if not pool.is_closed():
+        await pool.close()
+
+asyncio.run(main())</code></pre>
                         </div>
                     </div>
 
                     <div class="example-card">
                         <h3 class="example-title">💾 Batch Processing</h3>
                         <div class="example-code">
-                            <pre><code class="language-python">def bulk_insert_users(conn, users_data):
-    # Method 1: Single transaction
-    with conn.begin() as tx:
+                            <pre><code class="language-python">async def bulk_insert_users(pool, users_data):
+    # Single transaction - all rows commit or roll back together
+    tx = await pool.transaction()
+    async with tx:
         for user_data in users_data:
-            tx.execute(
+            await tx.execute(
                 "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
                 [user_data['name'], user_data['email'], user_data['age']]
             )
-    
-    # Method 2: Batch execution
-    queries = []
+
+    # There's no execute_batch() - looping awaited execute() calls
+    # is the working pattern (still parameterized, no string formatting)
     for user_data in users_data:
-        queries.append(
-            f"INSERT INTO users (name, email, age) VALUES "
-            f"('{user_data['name']}', '{user_data['email']}', {user_data['age']})"
-        )
-    
-    conn.execute_batch(queries)</code></pre>
+        await pool.execute(
+            "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
+            [user_data['name'], user_data['email'], user_data['age']]
+        )</code></pre>
                         </div>
                     </div>
                 </div>
@@ -836,14 +942,14 @@ class ConnectionPool:
                                 <div class="reason-icon">🌊</div>
                                 <div class="reason-content">
                                     <h4>Async I/O</h4>
-                                    <p>Tokio-powered async networking under the hood</p>
+                                    <p>sqlx + Tokio-powered async networking, releasing the GIL while waiting on Postgres</p>
                                 </div>
                             </div>
                             <div class="reason">
                                 <div class="reason-icon">📦</div>
                                 <div class="reason-content">
                                     <h4>No Dependencies</h4>
-                                    <p>No external Python dependencies to slow things down</p>
+                                    <p>No external Python dependencies</p>
                                 </div>
                             </div>
                         </div>
@@ -899,11 +1005,11 @@ class ConnectionPool:
                                         <td><span class="badge danger">📦 Many</span></td>
                                     </tr>
                                     <tr>
-                                        <td>API Simplicity</td>
-                                        <td><span class="badge success">✅ Simple</span></td>
-                                        <td><span class="badge warning">⚠️ Complex</span></td>
-                                        <td><span class="badge warning">⚠️ Async Only</span></td>
-                                        <td><span class="badge warning">⚠️ Complex</span></td>
+                                        <td>Async</td>
+                                        <td><span class="badge success">✅ Fully Async</span></td>
+                                        <td><span class="badge danger">❌ Sync</span></td>
+                                        <td><span class="badge success">✅ Fully Async</span></td>
+                                        <td><span class="badge warning">⚠️ Sync or Async</span></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -913,23 +1019,28 @@ class ConnectionPool:
                     <div class="performance-benchmark">
                         <h3>Performance Benchmark</h3>
                         <div class="benchmark-code">
-                            <pre><code class="language-python">import time
-import PostPyro as pg
+                            <pre><code class="language-python">import asyncio
+import time
+import PostPyro
 
-conn = pg.Connection("postgresql://user:pass@localhost/db")
+async def main():
+    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
 
-# Benchmark: Insert 10,000 records
-start_time = time.time()
+    # Benchmark: Insert 10,000 records concurrently across the pool
+    start_time = time.time()
 
-queries = []
-for i in range(10000):
-    queries.append(f"INSERT INTO benchmark (value) VALUES ({i})")
+    await asyncio.gather(*(
+        pool.execute("INSERT INTO benchmark (value) VALUES ($1)", [i])
+        for i in range(10000)
+    ))
 
-conn.execute_batch(queries)
+    elapsed = time.time() - start_time
+    print(f"Inserted 10,000 records in {elapsed:.2f} seconds")
+    print(f"Rate: {10000/elapsed:.0f} inserts/second")
 
-elapsed = time.time() - start_time
-print(f"Inserted 10,000 records in {elapsed:.2f} seconds")
-print(f"Rate: {10000/elapsed:.0f} inserts/second")</code></pre>
+    await pool.close()
+
+asyncio.run(main())</code></pre>
                         </div>
                     </div>
                 </div>
@@ -944,7 +1055,7 @@ print(f"Rate: {10000/elapsed:.0f} inserts/second")</code></pre>
                 <div class="footer-section">
                     <h3 class="footer-title">PostPyro</h3>
                     <p class="footer-description">
-                        High-Performance PostgreSQL Driver for Python built with Rust, PyO3, and tokio-postgres.
+                        Async PostgreSQL driver for Python, built with Rust, PyO3, and sqlx.
                     </p>
                     <div class="footer-links">
                         <a href="https://github.com/magi8101/PostPyro" target="_blank" class="footer-link">
@@ -983,17 +1094,17 @@ print(f"Rate: {10000/elapsed:.0f} inserts/second")</code></pre>
                     <ul class="footer-menu">
                         <li><span class="footer-tech">🦀 Rust</span></li>
                         <li><span class="footer-tech">🐍 PyO3</span></li>
-                        <li><span class="footer-tech">🌊 tokio-postgres</span></li>
+                        <li><span class="footer-tech">🌊 sqlx</span></li>
                         <li><span class="footer-tech">⚡ Maturin</span></li>
                     </ul>
                 </div>
             </div>
             <div class="footer-bottom">
                 <p class="footer-copyright">
-                    © 2024 PostPyro. Built with ❤️ using Rust, PyO3, and tokio-postgres.
+                    © 2024 PostPyro. Built with ❤️ using Rust, PyO3, and sqlx.
                 </p>
                 <p class="footer-version">
-                    Version 0.1.2 | MIT License
+                    Version 2.0.0-dev | MIT License
                 </p>
             </div>
         </div>

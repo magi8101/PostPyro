@@ -91,42 +91,47 @@
     <div class="container">
         <div class="hero">
             <h1>🔥 PostPyro Docs</h1>
-            <p>Interactive documentation for the high-performance PostgreSQL driver</p>
+            <p>Documentation for PostPyro, the async PostgreSQL driver for Python</p>
             <a href="index.html" class="btn">View Documentation</a>
         </div>
 
         <div class="features">
             <div class="feature">
                 <h3>📚 Complete API Reference</h3>
-                <p>Comprehensive documentation for all PostPyro classes, methods, and functions with examples.</p>
+                <p>Every PostPyro class, method, and function, with a runnable example for each.</p>
             </div>
             <div class="feature">
                 <h3>🚀 Quick Start Guide</h3>
-                <p>Get up and running with PostPyro in minutes with our interactive tutorials and code examples.</p>
+                <p>Tabbed code examples covering basic usage, queries, transactions, and advanced patterns.</p>
             </div>
             <div class="feature">
                 <h3>💡 Real-world Examples</h3>
                 <p>Learn how to integrate PostPyro with popular frameworks like FastAPI, pandas, and more.</p>
             </div>
             <div class="feature">
-                <h3>⚡ Performance Insights</h3>
-                <p>Discover why PostPyro outperforms other PostgreSQL drivers and how to optimize your usage.</p>
+                <h3>⚡ Performance Notes</h3>
+                <p>Why PostPyro's async design keeps I/O off the GIL, and what that means for your usage.</p>
             </div>
         </div>
 
         <div class="code-preview">
             <code>
-# Quick example of PostPyro in action<br>
-import PostPyro as pg<br><br>
+# Quick example of PostPyro in action (fully async)<br>
+import asyncio<br>
+import PostPyro<br><br>
 
-# Connect and query<br>
-conn = pg.Connection("postgresql://user:pass@localhost/db")<br>
-users = conn.query("SELECT * FROM users WHERE active = $1", [True])<br><br>
+async def main():<br>
+&nbsp;&nbsp;&nbsp;&nbsp;# Connect and query (connect() returns a Pool)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pool = await PostPyro.connect("postgresql://user:pass@localhost/db")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;users = await pool.query("SELECT * FROM users WHERE active = $1", [True])<br><br>
 
-# Use transactions<br>
-with conn.begin() as tx:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;tx.execute("INSERT INTO logs (event) VALUES ($1)", ["user_login"])<br>
-&nbsp;&nbsp;&nbsp;&nbsp;tx.execute("UPDATE users SET last_seen = NOW() WHERE id = $1", [user_id])
+&nbsp;&nbsp;&nbsp;&nbsp;# Use transactions - await transaction() before using it as `async with`<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tx = await pool.transaction()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;async with tx:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;await tx.execute("INSERT INTO logs (event) VALUES ($1)", ["user_login"])<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;await tx.execute("UPDATE users SET last_seen = NOW() WHERE id = $1", [user_id])<br><br>
+
+asyncio.run(main())
             </code>
         </div>
 

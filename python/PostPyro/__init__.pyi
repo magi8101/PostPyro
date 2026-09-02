@@ -1,175 +1,107 @@
 """
-Type stubs for pypg_driver - High-performance PostgreSQL driver for Python.
-
-This file provides type hints for IDE support and static type checking.
+Type stubs for PostPyro - async PostgreSQL driver for Python.
 """
 
 from typing import Any, Dict, List, Optional, Union, Iterator, Tuple
-import datetime
-import uuid
 
 __version__: str
 apilevel: str
 threadsafety: int
 paramstyle: str
 
-class DatabaseError(Exception):
-    """Base exception for all database-related errors."""
-    pass
-
-class InterfaceError(DatabaseError):
-    """Exception for client-side errors (connection, etc.)."""
-    pass
-
-class DataError(DatabaseError):
-    """Exception for data processing errors."""
-    pass
-
-class OperationalError(DatabaseError):
-    """Exception for database operational errors."""
-    pass
-
-class IntegrityError(DatabaseError):
-    """Exception for constraint violations."""
-    pass
-
-class InternalError(DatabaseError):
-    """Exception for database internal errors."""
-    pass
-
-class ProgrammingError(DatabaseError):
-    """Exception for SQL syntax errors and wrong parameters."""
-    pass
-
-class NotSupportedError(DatabaseError):
-    """Exception for unsupported operations."""
-    pass
+class DatabaseError(Exception): ...
+class InterfaceError(DatabaseError): ...
+class DataError(DatabaseError): ...
+class OperationalError(DatabaseError): ...
+class IntegrityError(DatabaseError): ...
+class InternalError(DatabaseError): ...
+class ProgrammingError(DatabaseError): ...
+class NotSupportedError(DatabaseError): ...
 
 class Row:
-    """Represents a single row from a query result."""
+    """One result row with name- and index-based column access; returned by `query`/`query_one`, never constructed directly."""
 
-    def __len__(self) -> int:
-        """Return the number of columns in this row."""
-        ...
-
+    def __len__(self) -> int: ...
     def __getitem__(self, key: Union[int, str]) -> Any:
-        """Get a column value by index (int) or name (str)."""
+        """Column value by position or name; negative indices count from the end, `KeyError`/`IndexError` if not found."""
         ...
-
     def __iter__(self) -> Iterator[Any]:
-        """Iterate over column values."""
+        """Iterates values in column order, not (name, value) pairs - use `items()` for that."""
         ...
-
-    def __repr__(self) -> str:
-        """String representation for debugging."""
-        ...
-
+    def __repr__(self) -> str: ...
     def get(self, key: Union[int, str], default: Any = None) -> Any:
-        """Get a column value with a default if not found."""
+        """Like `__getitem__` but returns `default` instead of raising when the key/index isn't found."""
         ...
-
     def keys(self) -> List[str]:
-        """Return a list of column names."""
+        """Column names in order, as a plain `list` - not a dict view, so no set operations or live reflection."""
         ...
-
     def values(self) -> List[Any]:
-        """Return a list of column values."""
+        """Column values in order, as a plain `list` - not a dict view."""
         ...
-
     def items(self) -> List[Tuple[str, Any]]:
-        """Return a list of (name, value) tuples."""
+        """(name, value) pairs in column order, as a plain `list` of tuples - not a dict view."""
         ...
-
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the row to a dictionary."""
+        """Copies the row into a real `dict`; if two columns share a name (e.g. an unaliased join), only the last survives."""
         ...
 
 class Transaction:
-    """Represents a database transaction."""
+    """A running transaction from `pool.transaction()`; use as `async with tx:` or call `commit`/`rollback` explicitly.
 
-    def execute(self, query: str, params: Optional[List[Any]] = None) -> int:
-        """Execute a query within the transaction that doesn't return rows."""
+    If neither happens (an exception unwinds past a `Transaction` without going
+    through `async with` or an explicit `commit`/`rollback`), cleanup falls back
+    to dropping the underlying connection, which only runs once nothing in
+    Python still references this object. A caught exception held by
+    `asyncio.gather(..., return_exceptions=True)` (or anything else retaining
+    the traceback) keeps that reference - and the checked-out connection, and
+    any row locks it holds - alive for as long as the exception is. Under
+    concurrent load this can exhaust the pool. Prefer `async with tx:`, which
+    rolls back immediately and doesn't have this dependency.
+    """
+
+    async def execute(self, query: str, params: Optional[List[Any]] = None) -> int:
+        """Runs a statement within this transaction and returns rows affected; raises `ProgrammingError` if already committed/rolled back."""
+        ...
+    async def query(self, query: str, params: Optional[List[Any]] = None) -> List[Row]:
+        """Runs a query within this transaction and returns all matching rows."""
+        ...
+    async def query_one(self, query: str, params: Optional[List[Any]] = None) -> Row:
+        """Returns the first matching row; raises `ProgrammingError` on zero rows, silently discards any rows beyond the first."""
+        ...
+    async def commit(self) -> None:
+        """Commits and ends the transaction; a second call raises `ProgrammingError`."""
+        ...
+    async def rollback(self) -> None:
+        """Rolls back and ends the transaction; a second call raises `ProgrammingError`."""
+        ...
+    def is_active(self) -> bool:
+        """True until `commit()`/`rollback()` has completed (including the implicit one from `__aexit__`)."""
+        ...
+    async def __aenter__(self) -> "Transaction": ...
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Commits on clean exit, rolls back if the block raised; never suppresses the exception (always returns `False`)."""
         ...
 
-    def query(self, query: str, params: Optional[List[Any]] = None) -> List[Row]:
-        """Execute a query within the transaction and return all rows."""
+class Pool:
+    """An async connection pool (`sqlx::PgPool`); obtain via the module-level `connect()`, never constructed directly."""
+
+    async def execute(self, query: str, params: Optional[List[Any]] = None) -> int:
+        """Runs a statement on a pooled connection and returns rows affected. `None` params bind as untyped SQL NULL, inferred from context."""
         ...
-
-    def query_one(self, query: str, params: Optional[List[Any]] = None) -> Row:
-        """Execute a query within the transaction and return exactly one row."""
+    async def query(self, query: str, params: Optional[List[Any]] = None) -> List[Row]:
+        """Runs a query on a pooled connection and returns all matching rows."""
         ...
-
-    def commit(self) -> None:
-        """Commit the transaction."""
+    async def query_one(self, query: str, params: Optional[List[Any]] = None) -> Row:
+        """Returns the first matching row; raises `ProgrammingError` on zero rows, silently discards any rows beyond the first."""
         ...
-
-    def rollback(self) -> None:
-        """Roll back the transaction."""
+    async def transaction(self) -> Transaction:
+        """Starts a transaction (a real `BEGIN` round-trip) and returns it; must be awaited before use as `async with`."""
         ...
-
-    def savepoint(self, name: str) -> None:
-        """Create a savepoint within the transaction."""
+    async def close(self) -> None:
+        """Closes all pooled connections; waits for in-flight queries to finish first."""
         ...
+    def is_closed(self) -> bool: ...
 
-    def rollback_to(self, name: str) -> None:
-        """Roll back to a savepoint."""
-        ...
-
-    def __enter__(self) -> 'Transaction':
-        """Context manager entry."""
-        ...
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit - auto-rollback on exception."""
-        ...
-
-class Connection:
-    """PostgreSQL database connection."""
-
-    def __init__(self, connection_string: str) -> None:
-        """Create a new database connection."""
-        ...
-
-    def execute(self, query: str, params: Optional[List[Any]] = None) -> int:
-        """Execute a query that doesn't return rows (INSERT, UPDATE, DELETE)."""
-        ...
-
-    def query(self, query: str, params: Optional[List[Any]] = None) -> List[Row]:
-        """Execute a query and return all rows."""
-        ...
-
-    def query_one(self, query: str, params: Optional[List[Any]] = None) -> Row:
-        """Execute a query and return exactly one row."""
-        ...
-
-    def prepare(self, query: str) -> str:
-        """Prepare a statement for repeated execution."""
-        ...
-
-    def close(self) -> None:
-        """Close the database connection."""
-        ...
-
-    def is_closed(self) -> bool:
-        """Check if the connection is closed."""
-        ...
-
-    def begin(self) -> Transaction:
-        """Begin a new transaction."""
-        ...
-
-    def __enter__(self) -> 'Connection':
-        """Context manager entry."""
-        ...
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit."""
-        ...
-
-def connect(connection_string: str) -> Connection:
-    """Connect to a PostgreSQL database."""
-    ...
-
-def get_version() -> str:
-    """Get the driver version."""
+async def connect(dsn: str, max_size: int = 10, min_size: int = 0) -> Pool:
+    """Opens a connection pool against `dsn`; the only way to obtain a `Pool`."""
     ...

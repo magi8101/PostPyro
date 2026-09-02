@@ -38,10 +38,11 @@ fn PostPyro(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("ProgrammingError", _py.get_type::<ProgrammingError>())?;
     m.add("NotSupportedError", _py.get_type::<NotSupportedError>())?;
 
-    m.add("__version__", "2.0.0-dev")?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("apilevel", "2.0")?;
     m.add("threadsafety", 2)?;
-    m.add("paramstyle", "format")?;
+    // Placeholders are $1, $2, ... (PEP 249 "numeric"), not "format" (%s).
+    m.add("paramstyle", "numeric")?;
 
     Ok(())
 }

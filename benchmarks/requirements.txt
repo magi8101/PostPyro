@@ -1,0 +1,7 @@
+# Dev-only dependencies for the comparison benchmark - not runtime
+# dependencies of PostPyro itself. Install these to run
+# bench_vs_alternatives.py against asyncpg and psycopg too; without them it
+# still runs and benchmarks PostPyro alone.
+asyncpg
+psycopg[binary]
+psycopg_pool
