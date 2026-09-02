@@ -69,15 +69,26 @@ impl Pool {
     fn is_closed(&self) -> bool {
         self.pool.is_closed()
     }
+
+    /// Begin a transaction. `tx = await pool.transaction()`, then either
+    /// explicit `await tx.commit()` / `await tx.rollback()`, or
+    /// `async with tx:` for auto-commit on clean exit / auto-rollback on
+    /// exception. Starting the transaction is itself async (it's a real
+    /// `BEGIN` round-trip), so `pool.transaction()` can't be used directly
+    /// as `async with pool.transaction() as tx:` - it must be awaited
+    /// first to get the `Transaction` object.
+    fn transaction<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let pool = self.pool.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let txn = pool.begin().await.map_err(map_db_error)?;
+            Ok(crate::transaction::Transaction::new(txn))
+        })
+    }
 }
 
 impl Pool {
     pub(crate) fn from_pg_pool(pool: PgPool) -> Self {
         Self { pool }
-    }
-
-    pub(crate) fn inner(&self) -> &PgPool {
-        &self.pool
     }
 }
 

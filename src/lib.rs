@@ -4,6 +4,7 @@ mod error;
 mod pool;
 mod row;
 mod runtime;
+mod transaction;
 mod types;
 
 use error::{
@@ -13,6 +14,7 @@ use error::{
 use pool::{connect, Pool};
 use row::Row;
 use runtime::RuntimeManager;
+use transaction::Transaction;
 
 #[pymodule]
 fn PostPyro(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -24,6 +26,7 @@ fn PostPyro(_py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_class::<Pool>()?;
     m.add_class::<Row>()?;
+    m.add_class::<Transaction>()?;
     m.add_function(wrap_pyfunction!(connect, m)?)?;
 
     m.add("DatabaseError", _py.get_type::<DatabaseError>())?;
