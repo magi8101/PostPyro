@@ -48,14 +48,10 @@ venv.bak/
 .idea/
 *.swp
 
-# Test files and demos
-*test*.py
-*demo*.py
-*benchmark*.py
-*example*.py
-*debug*.py
-*.md.backup
-Cargo_*.toml
+# Local AI-agent tooling (skill installs, lockfiles) - not part of the package
+.agents/
+.claude/
+skills-lock.json
 
 # Documentation builds
 docs/_build/
@@ -112,13 +108,6 @@ desktop.ini
 ehthumbs.db
 Icon?
 
-# Development and testing files
-*_test.py
-test_*.py
-demo.py
-kinsta_cloud_test.py
-async_demo.py
-
 # PyPI credentials (security)
 .pypirc
 
@@ -126,7 +115,6 @@ async_demo.py
 wheels/
 *.whl
 
-#md documentation
-ADVANCED_PARAMETER_SYSTEM.md
-BOOLEAN_PARAMETER_ERROR_ANALYSIS.md
-PostPyro_documentation.md
+# Superseded by the shipped implementation - kept locally, not published
+docs/superpowers/
+docs/README.md
