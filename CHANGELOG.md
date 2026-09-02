@@ -2,6 +2,27 @@
 
 All notable changes to PostPyro will be documented in this file.
 
+## [2.0.0] - Unreleased
+
+### Changed
+
+- **Breaking:** Replaced the synchronous `tokio-postgres`/`deadpool-postgres`-backed driver with an async driver built on `sqlx` + `pyo3-asyncio`. Every I/O method is now `async def`/`await` and releases the GIL during I/O instead of blocking the whole process.
+- **Breaking:** `Connection` and `ConnectionPool` are unified into a single `Pool` class, constructed via `await PostPyro.connect(dsn, max_size=10, min_size=0)` instead of `PostPyro.Connection(dsn)`/`PostPyro.ConnectionPool(dsn)`.
+- **Breaking:** `Transaction` is obtained via `await pool.transaction()` (previously undocumented-but-broken `Connection.begin()`, which never actually worked).
+
+### Fixed
+
+- `Row` column-name access (`row["column"]`) now looks up the actual column instead of always returning column 0.
+- Float parameters no longer lose precision to a forced `f32` downcast before binding.
+- `Row.keys()`/`values()`/`items()`/`to_dict()`/`get()`/`__iter__`/`__repr__` are implemented (previously documented but missing).
+- Binding a plain `None` into a non-text column (e.g. `INT4`, `FLOAT8`) no longer raises a Postgres type-mismatch error - it's now bound as an untyped NULL and Postgres infers the real column type, the same way `NULL` binds in other drivers.
+- Reading a column of a type the driver doesn't yet decode (e.g. `BYTEA`, arrays) now raises `NotSupportedError` naming the type, instead of silently returning `None` as if the value were a real SQL NULL.
+- `NUMERIC` columns decode to `decimal.Decimal` with full precision (previously fell into the same silent-`None` bug above).
+
+### Added
+
+- TLS-capable connections (via `sqlx`'s `rustls` backend) - the old driver hardcoded `NoTls`.
+
 ## [1.0.0] - 2025-10-03
 
 ### 🎉 First Production Release!
