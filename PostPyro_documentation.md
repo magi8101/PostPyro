@@ -433,7 +433,7 @@ await users.save("Alice", "alice@example.com")
 - **Async I/O**: `sqlx`'s async networking releases the GIL during I/O instead of blocking the whole process
 - **Binary protocol**: query results come back over Postgres's binary wire protocol, parsed in Rust
 
-The performance comparisons published for earlier (pre-rewrite, synchronous) versions of PostPyro no longer apply to this async driver and have not been re-benchmarked yet; treat any such numbers you find elsewhere as stale.
+The performance comparisons published for earlier (pre-rewrite, synchronous) versions of PostPyro no longer apply to this async driver and have not been re-benchmarked yet; treat any such numbers you find elsewhere as stale. `benchmarks/` has a harness that runs real timing against PostPyro, asyncpg, and psycopg on your own Postgres - run it yourself rather than trusting a number posted here, see `benchmarks/README.md`.
 
 ## Advanced Usage
 
