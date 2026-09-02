@@ -3,7 +3,8 @@
 ## Status
 
 Beta, pre-1.0. This document describes a ground-up rewrite of the driver core.
-Not for production use until this lands and is documented in the README.
+The rewrite has landed and is documented in the README - not for production
+use yet regardless, per the project's overall beta status.
 
 ## Why this rewrite
 
@@ -47,7 +48,10 @@ Rust implementation at all, despite being in the README, docstrings, and
    - Adds TLS support for free (the original code hardcoded `NoTls` — no
      encrypted connections were possible at all).
    - Broader native type coverage via feature flags (`chrono`, `uuid`, `json`,
-     `rust_decimal`) instead of hand-rolling conversions.
+     `bigdecimal`) instead of hand-rolling conversions. (Started on
+     `rust_decimal`; switched to `bigdecimal` during implementation once
+     `rust_decimal`'s ~28-29 significant-digit limit turned out to be
+     narrower than PostgreSQL's actual `NUMERIC` range.)
 
 2. **Python binding: `pyo3-asyncio` 0.20** (matches the pinned `pyo3 = "0.20"`),
    tokio feature. **Async-only** — no native synchronous Rust API, no

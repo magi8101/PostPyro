@@ -28,10 +28,8 @@ impl Row {
                 "Row indices must be an int or str, not bool",
             ));
         }
-        if let Ok(idx) = key.extract::<usize>() {
-            self.values
-                .get(idx)
-                .map(|v| v.clone_ref(py))
+        if let Ok(idx) = key.extract::<isize>() {
+            self.get_by_index(py, idx)
                 .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Row index out of range"))
         } else if let Ok(name) = key.extract::<&str>() {
             self.get_by_name(py, name)
@@ -61,8 +59,8 @@ impl Row {
         if key.is_instance_of::<PyBool>() {
             return Err(pyo3::exceptions::PyTypeError::new_err("key must be an int or str, not bool"));
         }
-        let found = if let Ok(idx) = key.extract::<usize>() {
-            self.values.get(idx).map(|v| v.clone_ref(py))
+        let found = if let Ok(idx) = key.extract::<isize>() {
+            self.get_by_index(py, idx)
         } else if let Ok(name) = key.extract::<&str>() {
             self.get_by_name(py, name)
         } else {
@@ -102,6 +100,17 @@ impl Row {
             .iter()
             .position(|n| n == name)
             .map(|idx| self.values[idx].clone_ref(py))
+    }
+
+    /// Python-style index: negative counts back from the end (`row[-1]` is
+    /// the last column), out of range (either direction) is `None`.
+    fn get_by_index(&self, py: Python, idx: isize) -> Option<PyObject> {
+        let len = self.values.len() as isize;
+        let real_idx = if idx < 0 { idx + len } else { idx };
+        if real_idx < 0 {
+            return None;
+        }
+        self.values.get(real_idx as usize).map(|v| v.clone_ref(py))
     }
 
     pub fn from_pg_row(py: Python, row: &PgRow) -> PyResult<Self> {

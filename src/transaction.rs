@@ -24,6 +24,21 @@ impl Transaction {
     }
 }
 
+impl Drop for Transaction {
+    fn drop(&mut self) {
+        // sqlx's `PoolConnection::drop` spawns the return-to-pool task onto
+        // the *ambient* Tokio runtime. Python drops this object on the
+        // interpreter thread, which has no ambient runtime, so the drop
+        // panics without this - and this crate's `panic = "abort"` release
+        // profile turns that panic into a hard process abort the first time
+        // a Transaction is dropped without being committed/rolled back
+        // (e.g. an exception before `tx.commit()`, or `pool.transaction()`
+        // awaited but never used as a context manager).
+        let _guard = crate::runtime::RuntimeManager::shared().enter();
+        drop(std::mem::replace(&mut self.inner, Arc::new(Mutex::new(None))));
+    }
+}
+
 #[pymethods]
 impl Transaction {
     #[pyo3(signature = (query, params=None))]
@@ -97,7 +112,7 @@ impl Transaction {
     }
 
     fn __aenter__<'p>(slf: PyRef<'_, Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let same = Py::new(py, Transaction { inner: Arc::clone(&slf.inner) })?;
+        let same: Py<Self> = slf.into();
         pyo3_asyncio::tokio::future_into_py(py, async move { Ok(same) })
     }
 

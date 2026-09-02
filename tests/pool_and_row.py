@@ -36,6 +36,12 @@ async def main():
     assert list(row) == [1, "Ada", 3.14159265358979, True]
     assert row.get("nonexistent", "default") == "default"
     assert row[0] == 1
+    assert row[-1] is True, row[-1]  # negative indexing counts from the end
+    try:
+        row[-99]
+        raise AssertionError("expected IndexError for an out-of-range negative index")
+    except IndexError:
+        pass
     assert len(row) == 4
 
     one = await pool.query_one("SELECT * FROM pool_and_row_test WHERE id = $1", [1])
@@ -50,7 +56,7 @@ async def main():
     await pool.execute("ALTER TABLE pool_and_row_test ADD CONSTRAINT id_unique UNIQUE (id)")
     try:
         await pool.execute("INSERT INTO pool_and_row_test (id) VALUES ($1)", [1])
-        assert False, "expected IntegrityError"
+        raise AssertionError("expected IntegrityError")
     except PostPyro.IntegrityError:
         pass
 

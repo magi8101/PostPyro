@@ -1,8 +1,8 @@
 [package]
 name = "PostPyro"
-version = "1.0.0"
+version = "2.0.0-dev"
 edition = "2021"
-description = "Ultra-fast PostgreSQL driver for Python built with Rust - Binary protocol, prepared statements, thread-safe,tokio-postgres"
+description = "Async PostgreSQL driver for Python built with Rust, sqlx, and pyo3-asyncio - releases the GIL during I/O"
 authors = ["Magi sharma J <sharmamagi0@gmail.com>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"

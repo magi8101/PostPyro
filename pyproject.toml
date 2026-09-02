@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "PostPyro"
-version = "1.0.0"
-description = "Ultra-fast PostgreSQL driver for Python built with Rust - Binary protocol, prepared statements, thread-safe"
+version = "2.0.0.dev0"
+description = "Async PostgreSQL driver for Python built with Rust, sqlx, and pyo3-asyncio - releases the GIL during I/O"
 readme = "README.md"
 license = {text = "MIT OR Apache-2.0"}
 requires-python = ">=3.8"
