@@ -6,7 +6,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/PostPyro)](https://pypi.org/project/PostPyro/)
 [![License](https://img.shields.io/pypi/l/PostPyro)](https://github.com/magi8101/PostPyro/blob/main/LICENSE)
 
-PostPyro wraps `sqlx` in a `PyO3`/`pyo3-asyncio` binding: every I/O method is `async def` and releases the GIL while waiting on Postgres, errors come back as a DB-API 2.0-flavored exception hierarchy, and connections can use `sqlx`'s `rustls` backend for TLS.
+PostPyro wraps `sqlx` in a `PyO3`/`pyo3-asyncio` binding: every I/O method is `async def` and releases the GIL while waiting on Postgres, errors come back as a DB-API 2.0-flavored exception hierarchy, and connections can use `sqlx`'s `rustls` backend for TLS. Parameters bind natively - `bool`/`int`/`float`/`str`/`None`, `datetime`/`date`/`time`, `uuid.UUID`, `decimal.Decimal`, `dict`, homogeneous `list`/`tuple` (as a real Postgres array), and `bytes`/`bytearray`/`memoryview` - with no manual `$1::type` casting in the SQL text.
 
 > **Status: Beta.** PostPyro is mid-rewrite from a synchronous driver to a fully async one. The API described below is the real, current surface (`python/PostPyro/__init__.pyi`) - not a roadmap. Expect breaking changes before a 1.0/stable release.
 
@@ -77,6 +77,8 @@ docker run -d --name postgres-test -e POSTGRES_PASSWORD=postgres -p 5433:5432 po
 python tests/pool_and_row.py
 python tests/transaction.py
 python tests/type_conversion_bugs.py
+python tests/native_binding.py
+python tests/native_array_binding.py
 ```
 
 ## License
