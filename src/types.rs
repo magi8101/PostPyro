@@ -325,14 +325,19 @@ pub fn bind_params<'q>(
     params: &[PyObject],
 ) -> PyResult<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>> {
     let mut has_null = false;
-    // The same Python class (datetime) binds two different wire types
-    // depending on tzinfo. sqlx's cache is keyed on SQL text only (see the
-    // long comment above), so a SQL text first prepared for a naive datetime
-    // (TIMESTAMP) would collide with a later aware call (TIMESTAMPTZ) -
-    // wrong parameter OID, "incorrect binary data format". Same hazard shape
-    // as the NULL case below; same fix: drop persistence for those calls.
-    let mut has_naive_ts = false;
-    let mut has_aware_ts = false;
+    // DATE, naive datetime (TIMESTAMP), and aware datetime (TIMESTAMPTZ) are
+    // three different wire sizes/formats bindable from overlapping Python
+    // types (date/datetime, and datetime again depending on tzinfo). sqlx's
+    // cache is keyed on SQL text only (see the long comment above), so a SQL
+    // text first prepared from one of these types would collide with a later
+    // call using a different one for the same placeholder - "incorrect
+    // binary data format" - even though any single call only ever sees one
+    // of the three. (An earlier version of this flag only caught two
+    // datetime kinds appearing *together in one call*, which doesn't guard
+    // the actual common case: separate calls to the same SQL text, one
+    // naive/aware/date at a time.) Same hazard shape as the NULL case below;
+    // same fix: drop persistence for every call that binds any of the three.
+    let mut has_ambiguous_temporal = false;
     let mut query = query;
     for obj in params {
         let obj_ref = obj.as_ref(py);
@@ -354,15 +359,16 @@ pub fn bind_params<'q>(
         } else if py_isinstance(py, obj_ref, &PY_DATETIME, "datetime", "datetime")? {
             match py_datetime_to_param(obj_ref)? {
                 PyDateTimeParam::Timestamp(naive) => {
-                    has_naive_ts = true;
+                    has_ambiguous_temporal = true;
                     query = query.bind(naive)
                 }
                 PyDateTimeParam::Timestamptz(utc) => {
-                    has_aware_ts = true;
+                    has_ambiguous_temporal = true;
                     query = query.bind(utc)
                 }
             }
         } else if py_isinstance(py, obj_ref, &PY_DATE, "datetime", "date")? {
+            has_ambiguous_temporal = true;
             let d = py_date_to_chrono(obj_ref)?;
             query = query.bind(d)
         } else if py_isinstance(py, obj_ref, &PY_TIME, "datetime", "time")? {
@@ -429,11 +435,9 @@ pub fn bind_params<'q>(
         };
     }
     // Non-persistent whenever any parameter's wire type depends on runtime
-    // context the SQL text doesn't capture: an untyped NULL (OID 0), or a
-    // datetime whose naive/aware split decides TIMESTAMP vs TIMESTAMPTZ.
-    Ok(query.persistent(
-        !(has_null || (has_naive_ts && has_aware_ts)),
-    ))
+    // context the SQL text doesn't capture: an untyped NULL (OID 0), or any
+    // DATE/TIMESTAMP/TIMESTAMPTZ binding (see has_ambiguous_temporal above).
+    Ok(query.persistent(!(has_null || has_ambiguous_temporal)))
 }
 
 fn list_or_tuple_items(obj: &PyAny) -> Option<Vec<&PyAny>> {

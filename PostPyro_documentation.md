@@ -309,7 +309,7 @@ PostPyro automatically converts between Python and PostgreSQL types.
 | `TIMESTAMPTZ`                         | `datetime.datetime`   | With timezone info (UTC)                       |
 | `UUID`                                | `str`                 | `'550e8400-e29b-41d4-a716-446655440000'`       |
 | `JSON`, `JSONB`                       | `dict`, `list`, etc.  | `{"key": "value"}`, `[1, 2, 3]`                |
-| `BYTEA`                               | `bytes`               | `b"\\x00\\x01"`                                |
+| `BYTEA`                               | `bytes`               | `b"\x00\x01"`                                  |
 | `BOOL[]`, `INT2[]`/`INT4[]`/`INT8[]`, `FLOAT4[]`/`FLOAT8[]`, `TEXT[]`/`VARCHAR[]`/`CHAR[]`/`BPCHAR[]`/`NAME[]` | `list` | `[1, 2, 3]`, `["a", "b"]` |
 
 ### Binding Parameters
@@ -363,10 +363,12 @@ accepts `NaN`, but BigDecimal has no such values - bind the string
 `'NaN'::numeric` if you need it). A `set`/`frozenset` also raises
 `DataError` naming the type, same as any other JSON-incompatible object.
 
-`int` still binds as `BIGINT` regardless of magnitude - cast in SQL
-(`$1::int4`) when a narrower column needs an exact match. Anything not in
-this table (e.g. an `INET` value) falls back to `str(obj)` as `TEXT` - pass
-those as strings with an explicit cast (`$1::inet`).
+`int` binds as `BIGINT` within the signed 64-bit range (`-2**63` to
+`2**63 - 1`); an `int` outside that range raises an extraction error rather
+than falling back to `TEXT`. Cast in SQL (`$1::int4`) when a narrower column
+needs an exact match. Anything not in this table (e.g. an `INET` value)
+falls back to `str(obj)` as `TEXT` - pass those as strings with an explicit
+cast (`$1::inet`).
 
 ### Type Usage Example
 

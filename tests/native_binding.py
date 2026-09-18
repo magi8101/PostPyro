@@ -243,9 +243,9 @@ async def main():
     except PostPyro.DataError:
         pass
 
-    # === Mixed naive + aware datetimes in one call to the same SQL text
+    # === Separate calls to the same SQL text, one aware then one naive,
     # must not poison sqlx's prepared-statement cache (TIMESTAMP vs
-    # TIMESTAMPTZ wire types for one parameter slot) ===
+    # TIMESTAMPTZ wire types for the same parameter slot) ===
     await pool.execute("DELETE FROM native_binding_test WHERE id IN (16, 17)")
     await pool.execute(
         "INSERT INTO native_binding_test (id, tstz) VALUES ($1, $2)",
