@@ -310,6 +310,7 @@ PostPyro automatically converts between Python and PostgreSQL types.
 | `UUID`                                | `str`                 | `'550e8400-e29b-41d4-a716-446655440000'`       |
 | `JSON`, `JSONB`                       | `dict`, `list`, etc.  | `{"key": "value"}`, `[1, 2, 3]`                |
 | `BYTEA`                               | `bytes`               | `b"\\x00\\x01"`                                |
+| `BOOL[]`, `INT2[]`/`INT4[]`/`INT8[]`, `FLOAT4[]`/`FLOAT8[]`, `TEXT[]`/`VARCHAR[]`/`CHAR[]`/`BPCHAR[]`/`NAME[]` | `list` | `[1, 2, 3]`, `["a", "b"]` |
 
 ### Binding Parameters
 
@@ -330,18 +331,27 @@ text:
 | `datetime.time` (naive)                                | `TIME`                            |
 | `uuid.UUID`                                            | `UUID`                            |
 | `decimal.Decimal`                                      | `NUMERIC` (exact)                 |
-| `dict`, `list`, `tuple`                                | `JSON`/`JSONB`                    |
+| `dict`                                                 | `JSON`/`JSONB`                    |
+| `list`, `tuple` (homogeneous `bool`/`int`/`float`/`str`, `None` allowed) | `bool[]`/`int8[]`/`float8[]`/`text[]` |
+| `list`, `tuple` (mixed types, nested)                  | `JSON`/`JSONB`                    |
 | `bytes`, `bytearray`, `memoryview`                     | `BYTEA`                           |
 
-**Lists bind as JSON, not Postgres arrays.** This keeps dict/list/tuple
-symmetric with `json.dumps` and matches the JSON read side. To bind a
-Postgres *array* instead, stringify the list and cast in the SQL text:
+**A homogeneous list/tuple binds as a Postgres array**, matching
+`asyncpg`'s default and avoiding the JSON `int4[]` cast dance:
 
 ```python
-await pool.query("SELECT * FROM scores WHERE id = ANY($1::int4[])", ["{1,2,3}"])
-# or, for a TEXT[]:
-await pool.execute("INSERT INTO tags (names) VALUES ($1::text[])", ["{'a','b'}"])
+await pool.execute(
+    "INSERT INTO tags (id, names, scores) VALUES ($1, $2, $3)",
+    [1, ["a", "b"], [10, 20, None]],  # None -> NULL array element
+)
 ```
+
+A `list`/`tuple` that isn't homogeneous (mixed types, or nesting - `dict`
+always) falls back to JSON/JSONB via the same conversion, symmetric with
+`json.dumps`/the JSON read side. To force a specific array element type
+narrower than what auto-conversion picks (`int` -> `int8[]`, `float` ->
+`float8[]`), cast in the SQL text (`$1::int4[]`) the same way scalar `int`
+casts to `int4`.
 
 Two intentional limitations, both loud rather than silent: a
 `datetime.time` carrying `tzinfo` raises `NotSupportedError` (Postgres
@@ -350,12 +360,13 @@ nested deeper than 128 levels raise `DataError` (a self-referential dict
 would otherwise overflow the Rust stack - an abort, not an exception).
 `Decimal("NaN")`/`Decimal("Infinity")` are also rejected (Postgres NUMERIC
 accepts `NaN`, but BigDecimal has no such values - bind the string
-`'NaN'::numeric` if you need it).
+`'NaN'::numeric` if you need it). A `set`/`frozenset` also raises
+`DataError` naming the type, same as any other JSON-incompatible object.
 
 `int` still binds as `BIGINT` regardless of magnitude - cast in SQL
 (`$1::int4`) when a narrower column needs an exact match. Anything not in
-this table (e.g. a `set`, or an `INET` value) falls back to `str(obj)` as
-`TEXT` - pass those as strings with an explicit cast (`$1::inet`).
+this table (e.g. an `INET` value) falls back to `str(obj)` as `TEXT` - pass
+those as strings with an explicit cast (`$1::inet`).
 
 ### Type Usage Example
 

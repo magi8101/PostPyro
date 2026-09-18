@@ -295,15 +295,30 @@ fn py_time_to_chrono(obj: &PyAny) -> PyResult<NaiveTime> {
 /// (matching sqlx's own type map - see docs.rs/sqlx postgres::types):
 /// `datetime.datetime` -> TIMESTAMP/TIMESTAMPTZ, `datetime.date` -> DATE,
 /// `datetime.time` -> TIME, `uuid.UUID` -> UUID, `decimal.Decimal` ->
-/// NUMERIC, `dict`/`list`/`tuple` -> JSON/JSONB, `bytes`/`bytearray` ->
-/// BYTEA. A timezone-aware datetime binds as TIMESTAMPTZ (utc offset
-/// applied), a naive one as TIMESTAMP - Postgres stores both correctly
-/// without any `$1::type` cast in the SQL text.
+/// NUMERIC, `bytes`/`bytearray`/`memoryview` -> BYTEA. A timezone-aware
+/// datetime binds as TIMESTAMPTZ (utc offset applied), a naive one as
+/// TIMESTAMP - Postgres stores both correctly without any `$1::type` cast in
+/// the SQL text.
+///
+/// A `list`/`tuple` of a single primitive type (`bool`/`int`/`float`/`str`,
+/// `None` entries allowed) binds as a real Postgres array of that type - see
+/// `py_sequence_to_array`. `dict`, and any list/tuple that isn't a
+/// homogeneous primitive sequence (mixed types, nesting), binds as
+/// JSON/JSONB via `py_to_json` instead.
+///
+/// ponytail: like the untyped-NULL and naive/aware-datetime hazards
+/// documented above, an array's element type (bool[] vs. int8[] vs. text[])
+/// isn't accounted for in the persistent-statement cache key either - the
+/// same SQL text called once with an int array and later with a string
+/// array for the same placeholder hits the identical "incorrect binary data
+/// format" failure mode. Same upgrade path: key the cache on argument type
+/// fingerprint, not SQL text alone, if this becomes a real collision.
 ///
 /// Anything else still falls through to `str(obj)` and binds as TEXT (see
 /// the last arm below) - e.g. pass `INET` values as strings with an
-/// explicit `$1::inet` cast. See `tests/native_binding.py` for working
-/// examples of every natively-bound type.
+/// explicit `$1::inet` cast. See `tests/native_binding.py` and
+/// `tests/native_array_binding.py` for working examples of every
+/// natively-bound type.
 pub fn bind_params<'q>(
     query: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
     py: Python,
@@ -364,9 +379,16 @@ pub fn bind_params<'q>(
             let d = BigDecimal::from_str(&obj_ref.str()?.extract::<String>()?)
                 .map_err(|e| DataError::new_err(format!("invalid Decimal parameter: {}", e)))?;
             query = query.bind(d)
+        } else if let Some(items) = list_or_tuple_items(obj_ref) {
+            // A homogeneous bool/int/float/str list/tuple binds as a real
+            // Postgres array; anything else (mixed types, nested
+            // containers) falls through to the same JSON conversion a
+            // dict gets, below - see py_sequence_to_array.
+            query = match py_sequence_to_array(&items)? {
+                Some(array) => bind_array(query, array),
+                None => query.bind(py_to_json(obj_ref)?),
+            }
         } else if obj_ref.downcast::<PyDict>().is_ok()
-            || obj_ref.downcast::<PyList>().is_ok()
-            || obj_ref.downcast::<PyTuple>().is_ok()
             || obj_ref.downcast::<PySet>().is_ok()
             || obj_ref.downcast::<PyFrozenSet>().is_ok()
         {
@@ -412,6 +434,102 @@ pub fn bind_params<'q>(
     Ok(query.persistent(
         !(has_null || (has_naive_ts && has_aware_ts)),
     ))
+}
+
+fn list_or_tuple_items(obj: &PyAny) -> Option<Vec<&PyAny>> {
+    if let Ok(l) = obj.downcast::<PyList>() {
+        Some(l.iter().collect())
+    } else if let Ok(t) = obj.downcast::<PyTuple>() {
+        Some(t.iter().collect())
+    } else {
+        None
+    }
+}
+
+/// A homogeneous Python list/tuple, ready to bind as a real Postgres array
+/// (`bool[]`/`int8[]`/`float8[]`/`text[]`) instead of falling back to the
+/// same JSON conversion a dict gets. `None` elements become SQL NULL entries
+/// in the array, matching how a bare `None` parameter already binds as SQL
+/// NULL.
+enum PyArrayParam {
+    Bool(Vec<Option<bool>>),
+    Int(Vec<Option<i64>>),
+    Float(Vec<Option<f64>>),
+    Text(Vec<Option<String>>),
+}
+
+/// Classify a Python list/tuple as a homogeneous primitive array, the same
+/// way a bare scalar is classified in `bind_params` above (bool before int,
+/// since `bool` is a subclass of `int` in Python). Returns `Ok(None)` - not
+/// an error - for anything that doesn't cleanly fit one primitive type
+/// (mixed element types, a nested list, a dict, ...), so the caller falls
+/// back to `py_to_json` for it instead of hard-failing here.
+///
+/// ponytail: an all-`None` list has no element type to infer, so it binds as
+/// `text[]` (Postgres's own default array elem type is also `text` for an
+/// untyped `ARRAY[NULL]` literal) - add an explicit-type escape hatch (cast
+/// in the SQL text) if a caller ever needs a typed all-NULL array.
+fn py_sequence_to_array(items: &[&PyAny]) -> PyResult<Option<PyArrayParam>> {
+    #[derive(PartialEq, Clone, Copy)]
+    enum Kind {
+        Bool,
+        Int,
+        Float,
+        Text,
+    }
+
+    let mut kind: Option<Kind> = None;
+    for item in items {
+        if item.is_none() {
+            continue;
+        }
+        let this_kind = if item.downcast::<PyBool>().is_ok() {
+            Kind::Bool
+        } else if item.downcast::<PyInt>().is_ok() {
+            Kind::Int
+        } else if item.downcast::<PyFloat>().is_ok() {
+            Kind::Float
+        } else if item.downcast::<PyString>().is_ok() {
+            Kind::Text
+        } else {
+            return Ok(None);
+        };
+        match kind {
+            None => kind = Some(this_kind),
+            Some(k) if k == this_kind => {}
+            Some(_) => return Ok(None),
+        }
+    }
+
+    Ok(Some(match kind {
+        None => PyArrayParam::Text(items.iter().map(|_| None).collect()),
+        Some(Kind::Bool) => PyArrayParam::Bool(extract_array(items, |i| i.extract::<bool>())?),
+        Some(Kind::Int) => PyArrayParam::Int(extract_array(items, |i| i.extract::<i64>())?),
+        Some(Kind::Float) => PyArrayParam::Float(extract_array(items, |i| i.extract::<f64>())?),
+        Some(Kind::Text) => PyArrayParam::Text(extract_array(items, |i| i.extract::<String>())?),
+    }))
+}
+
+fn extract_array<T>(
+    items: &[&PyAny],
+    extract: impl Fn(&PyAny) -> PyResult<T>,
+) -> PyResult<Vec<Option<T>>> {
+    items
+        .iter()
+        .map(|item| if item.is_none() { Ok(None) } else { extract(item).map(Some) })
+        .collect()
+}
+
+fn bind_array<'q>(
+    query: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
+    array: PyArrayParam,
+) -> sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments> {
+    match array {
+        PyArrayParam::Bool(v) => query.bind(v),
+        PyArrayParam::Int(v) => query.bind(v),
+        PyArrayParam::Float(v) => query.bind(v),
+        PyArrayParam::Text(v) => query.bind(v),
+    }
 }
 
 /// Decode one column of a type that has both sqlx's wire decode (`Decode`/`Type`)
@@ -596,6 +714,15 @@ pub fn pg_value_to_py(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject>
         "FLOAT8" => decode_scalar::<f64>(py, row, idx),
         "TEXT" | "VARCHAR" | "CHAR" | "BPCHAR" | "NAME" => decode_scalar::<String>(py, row, idx),
         "BYTEA" => decode_bytea(py, row, idx),
+        "BOOL[]" => decode_scalar::<Vec<Option<bool>>>(py, row, idx),
+        "INT2[]" => decode_scalar::<Vec<Option<i16>>>(py, row, idx),
+        "INT4[]" => decode_scalar::<Vec<Option<i32>>>(py, row, idx),
+        "INT8[]" => decode_scalar::<Vec<Option<i64>>>(py, row, idx),
+        "FLOAT4[]" => decode_scalar::<Vec<Option<f32>>>(py, row, idx),
+        "FLOAT8[]" => decode_scalar::<Vec<Option<f64>>>(py, row, idx),
+        "TEXT[]" | "VARCHAR[]" | "CHAR[]" | "BPCHAR[]" | "NAME[]" => {
+            decode_scalar::<Vec<Option<String>>>(py, row, idx)
+        }
         "NUMERIC" => decode_numeric(py, row, idx),
         "UUID" => decode_uuid(py, row, idx),
         "TIMESTAMP" => decode_timestamp(py, row, idx),
