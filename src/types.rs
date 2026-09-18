@@ -2,6 +2,7 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
+use pyo3::types::PyMemoryView;
 use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use sqlx::postgres::PgRow;
 use sqlx::postgres::types::Oid;
@@ -47,11 +48,15 @@ fn py_isinstance(
     name: &str,
 ) -> PyResult<bool> {
     let cls = py_class(py, cell, module, name)?;
-    py.import("builtins")?
-        .getattr("isinstance")?
-        .call1((obj, cls))?
-        .is_true()
+    obj.is_instance(cls)
 }
+
+/// Maximum nesting depth accepted when converting a Python container to a
+/// JSON value. A self-referential dict (easily built by accident) would
+/// otherwise recurse until the Rust stack overflows - an abort, not a
+/// catchable Python exception. Python's own json.dumps dies on the same
+/// input via its recursion guard; this is our shallower equivalent.
+const MAX_JSON_DEPTH: usize = 128;
 
 /// Convert a Python dict/list/tuple into a `serde_json::Value` for binding
 /// against JSON/JSONB columns. Mirrors the read side (`json_to_py` below)
@@ -59,7 +64,17 @@ fn py_isinstance(
 /// `DataError` rather than silently degrading to a lossy float - the read
 /// side hands such numbers through as strings, but guessing on the write
 /// side would corrupt data, so it fails loudly instead.
-fn py_to_json(py: Python, obj: &PyAny) -> PyResult<serde_json::Value> {
+fn py_to_json(obj: &PyAny) -> PyResult<serde_json::Value> {
+    py_to_json_depth(obj, 0)
+}
+
+fn py_to_json_depth(obj: &PyAny, depth: usize) -> PyResult<serde_json::Value> {
+    if depth > MAX_JSON_DEPTH {
+        return Err(DataError::new_err(format!(
+            "parameter nesting exceeds {} levels - too deep to bind as JSON (self-referential container?)",
+            MAX_JSON_DEPTH
+        )));
+    }
     if obj.is_none() {
         Ok(serde_json::Value::Null)
     } else if let Ok(b) = obj.downcast::<PyBool>() {
@@ -81,22 +96,24 @@ fn py_to_json(py: Python, obj: &PyAny) -> PyResult<serde_json::Value> {
     } else if let Ok(l) = obj.downcast::<PyList>() {
         let mut items = Vec::with_capacity(l.len());
         for item in l.iter() {
-            items.push(py_to_json(py, item)?);
+            items.push(py_to_json_depth(item, depth + 1)?);
         }
         Ok(serde_json::Value::Array(items))
     } else if let Ok(t) = obj.downcast::<PyTuple>() {
         let mut items = Vec::with_capacity(t.len());
         for item in t.iter() {
-            items.push(py_to_json(py, item)?);
+            items.push(py_to_json_depth(item, depth + 1)?);
         }
         Ok(serde_json::Value::Array(items))
     } else if let Ok(d) = obj.downcast::<PyDict>() {
         let mut map = serde_json::Map::new();
         for (k, v) in d.iter() {
             // JSON object keys are strings; non-string keys are stringified
-            // (same as json.dumps does for int keys), not an error.
+            // (same as json.dumps does for int keys), not an error. Note a
+            // collision ({1: "a", "1": "b"}) silently keeps the last value,
+            // exactly like json.dumps.
             let key = k.str()?.extract::<String>()?;
-            map.insert(key, py_to_json(py, v)?);
+            map.insert(key, py_to_json_depth(v, depth + 1)?);
         }
         Ok(serde_json::Value::Object(map))
     } else {
@@ -168,6 +185,11 @@ enum PyDateTimeParam {
 /// are read through the plain `PyAny` API because pyo3 compiles its chrono
 /// `FromPyObject` impls out under `abi3` (same constraint as the decode
 /// side below).
+///
+/// The offset is read via `datetime.utcoffset()` on the datetime itself -
+/// NOT `tzinfo.utcoffset()`, which takes the datetime as an argument and
+/// would raise `TypeError` (and, for a DST-observing zone, has no
+/// offset-independent answer at all).
 fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
     let naive = NaiveDateTime::new(
         NaiveDate::from_ymd_opt(
@@ -184,13 +206,9 @@ fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
         )
         .ok_or_else(|| DataError::new_err("invalid time component in datetime parameter"))?,
     );
-    let tzinfo = obj.getattr("tzinfo")?;
-    if tzinfo.is_none() {
-        return Ok(PyDateTimeParam::Timestamp(naive));
-    }
-    // utcoffset() -> timedelta (or None, for a tzinfo that doesn't know its
-    // own offset - treat like naive rather than guessing).
-    let offset = tzinfo.call_method0("utcoffset")?;
+    // utcoffset() -> timedelta, or None when the tzinfo can't determine the
+    // offset for this instant - treat that like naive rather than guessing.
+    let offset = obj.call_method0("utcoffset")?;
     if offset.is_none() {
         return Ok(PyDateTimeParam::Timestamp(naive));
     }
@@ -286,9 +304,21 @@ pub fn bind_params<'q>(
     params: &[PyObject],
 ) -> PyResult<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>> {
     let mut has_null = false;
+    // The same Python class (datetime) binds two different wire types
+    // depending on tzinfo. sqlx's cache is keyed on SQL text only (see the
+    // long comment above), so a SQL text first prepared for a naive datetime
+    // (TIMESTAMP) would collide with a later aware call (TIMESTAMPTZ) -
+    // wrong parameter OID, "incorrect binary data format". Same hazard shape
+    // as the NULL case below; same fix: drop persistence for those calls.
+    let mut has_naive_ts = false;
+    let mut has_aware_ts = false;
     let mut query = query;
     for obj in params {
         let obj_ref = obj.as_ref(py);
+        // ORDER MATTERS: datetime must be checked before date -
+        // datetime.datetime is a subclass of datetime.date, and isinstance
+        // (deliberately used here for subclass support) would otherwise bind
+        // every datetime as a bare DATE, silently dropping its time.
         if obj.is_none(py) {
             has_null = true;
             query = query.bind(UnspecifiedNull);
@@ -302,8 +332,14 @@ pub fn bind_params<'q>(
             query = query.bind(s.extract::<String>()?)
         } else if py_isinstance(py, obj_ref, &PY_DATETIME, "datetime", "datetime")? {
             match py_datetime_to_param(obj_ref)? {
-                PyDateTimeParam::Timestamp(naive) => query = query.bind(naive),
-                PyDateTimeParam::Timestamptz(utc) => query = query.bind(utc),
+                PyDateTimeParam::Timestamp(naive) => {
+                    has_naive_ts = true;
+                    query = query.bind(naive)
+                }
+                PyDateTimeParam::Timestamptz(utc) => {
+                    has_aware_ts = true;
+                    query = query.bind(utc)
+                }
             }
         } else if py_isinstance(py, obj_ref, &PY_DATE, "datetime", "date")? {
             let d = py_date_to_chrono(obj_ref)?;
@@ -312,7 +348,11 @@ pub fn bind_params<'q>(
             let t = py_time_to_chrono(obj_ref)?;
             query = query.bind(t)
         } else if py_isinstance(py, obj_ref, &PY_UUID, "uuid", "UUID")? {
-            let u = obj_ref.extract::<Uuid>()?;
+            // Parse from the string form - pyo3 has no FromPyObject for
+            // uuid::Uuid under this crate's feature set (and extracting via
+            // an assumed impl would simply not compile).
+            let u = Uuid::parse_str(&obj_ref.str()?.extract::<String>()?)
+                .map_err(|e| DataError::new_err(format!("invalid UUID parameter: {}", e)))?;
             query = query.bind(u)
         } else if py_isinstance(py, obj_ref, &PY_DECIMAL, "decimal", "Decimal")? {
             let d = BigDecimal::from_str(&obj_ref.str()?.extract::<String>()?)
@@ -322,7 +362,7 @@ pub fn bind_params<'q>(
             || obj_ref.downcast::<PyList>().is_ok()
             || obj_ref.downcast::<PyTuple>().is_ok()
         {
-            let json = py_to_json(py, obj_ref)?;
+            let json = py_to_json(obj_ref)?;
             query = query.bind(json)
         } else if let Ok(b) = obj_ref.downcast::<PyBytes>() {
             // Owned Vec (not the &[u8] borrow): the local borrow can't
@@ -334,12 +374,22 @@ pub fn bind_params<'q>(
             // holding the borrow across sqlx's async encode path could race
             // a concurrent Python-side resize of the same bytearray.
             query = query.bind(b.to_vec())
+        } else if let Ok(m) = obj_ref.downcast::<PyMemoryView>() {
+            // memoryview sits next to bytes/bytearray in users' minds;
+            // letting it fall through to the TEXT fallback would silently
+            // bind the repr ("<memory at 0x...>") as the value.
+            query = query.bind(m.extract::<Vec<u8>>()?)
         } else {
             let s = obj_ref.str()?.extract::<String>()?;
             query = query.bind(s)
         };
     }
-    Ok(query.persistent(!has_null))
+    // Non-persistent whenever any parameter's wire type depends on runtime
+    // context the SQL text doesn't capture: an untyped NULL (OID 0), or a
+    // datetime whose naive/aware split decides TIMESTAMP vs TIMESTAMPTZ.
+    Ok(query.persistent(
+        !(has_null || (has_naive_ts && has_aware_ts)),
+    ))
 }
 
 /// Decode one column of a type that has both sqlx's wire decode (`Decode`/`Type`)

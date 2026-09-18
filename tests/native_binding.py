@@ -134,6 +134,136 @@ async def main():
     row_tx = await pool.query_one("SELECT ts, uid, price FROM native_binding_test WHERE id = 10")
     assert row_tx["ts"] == naive_dt and row_tx["uid"] == str(test_uuid) and row_tx["price"] == test_price
 
+    # === DST: same aware wall-clock in a UTC+2 zone at both offsets must
+    # land on different instants, and each must round trip exactly. This is
+    # the test that catches calling tzinfo.utcoffset() without the datetime
+    # (wrong object - TypeError) or ignoring the offset entirely.
+    zone_plus2 = datetime.timezone(datetime.timedelta(hours=2), "UTC+2")
+    summer = datetime.datetime(2024, 7, 15, 12, 0, 0, tzinfo=zone_plus2)
+    winter = datetime.datetime(2024, 1, 15, 12, 0, 0, tzinfo=zone_plus2)
+    assert summer.utcoffset() == winter.utcoffset(), "fixed-offset zone sanity"
+    await pool.execute("DELETE FROM native_binding_test WHERE id IN (6, 7)")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, tstz) VALUES ($1, $2), ($3, $4)",
+        [6, summer, 7, winter],
+    )
+    for rid, sent in ((6, summer), (7, winter)):
+        got = (await pool.query_one("SELECT tstz FROM native_binding_test WHERE id = $1", [rid]))["tstz"]
+        assert got == sent.astimezone(datetime.timezone.utc), f"id={rid}: sent {sent!r}, got {got!r}"
+
+    # A real DST-observing zone (us/Eastern-like via two fixed offsets, since
+    # zoneinfo may be absent on some wheels): offset differs by month, and
+    # each datetime must convert using ITS OWN offset.
+    dst_summer = datetime.datetime(2024, 7, 15, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-4)))
+    dst_winter = datetime.datetime(2024, 1, 15, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-5)))
+    assert dst_summer.utcoffset() != dst_winter.utcoffset()
+    await pool.execute("DELETE FROM native_binding_test WHERE id IN (8, 9)")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, tstz) VALUES ($1, $2), ($3, $4)",
+        [8, dst_summer, 9, dst_winter],
+    )
+    for rid, sent in ((8, dst_summer), (9, dst_winter)):
+        got = (await pool.query_one("SELECT tstz FROM native_binding_test WHERE id = $1", [rid]))["tstz"]
+        assert got == sent.astimezone(datetime.timezone.utc), f"id={rid}: sent {sent!r}, got {got!r}"
+
+    # === datetime.min / datetime.max extremes round trip exactly ===
+    await pool.execute("DELETE FROM native_binding_test WHERE id = 10")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, ts) VALUES ($1, $2)",
+        [10, datetime.datetime.min],
+    )
+    got = (await pool.query_one("SELECT ts FROM native_binding_test WHERE id = 10"))["ts"]
+    assert got == datetime.datetime.min, got
+    await pool.execute("UPDATE native_binding_test SET ts = $1 WHERE id = 10", [datetime.datetime.max])
+    got = (await pool.query_one("SELECT ts FROM native_binding_test WHERE id = 10"))["ts"]
+    assert got == datetime.datetime.max, got
+
+    # === Decimal extremes: high precision, trailing zeros preserved through
+    # NUMERIC (read back equal, not float-comparable) ===
+    await pool.execute("DELETE FROM native_binding_test WHERE id = 11")
+    hi_prec = decimal.Decimal("1234567890.123456789012345678901234567890")
+    trailing = decimal.Decimal("10.500")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, price) VALUES ($1, $2), ($3, $4)",
+        [11, hi_prec, 12, trailing],
+    )
+    got = (await pool.query_one("SELECT price FROM native_binding_test WHERE id = 11"))["price"]
+    assert got == hi_prec, f"high-precision decimal: {got!r}"
+    got = (await pool.query_one("SELECT price FROM native_binding_test WHERE id = 12"))["price"]
+    assert got == trailing, f"trailing zeros: {got!r}"
+
+    # === A datetime subclass binds as a datetime (isinstance-based check),
+    # and deep-but-legal JSON nesting works ===
+    class MyDatetime(datetime.datetime):
+        pass
+
+    await pool.execute("DELETE FROM native_binding_test WHERE id = 13")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, ts) VALUES ($1, $2)",
+        [13, MyDatetime(2024, 3, 15, 10, 30, 0, 123456)],
+    )
+    got = (await pool.query_one("SELECT ts FROM native_binding_test WHERE id = 13"))["ts"]
+    assert got == naive_dt, f"datetime subclass: {got!r}"
+
+    deep = current = {}
+    for i in range(100):
+        current["child"] = {}
+        current = current["child"]
+    await pool.execute("DELETE FROM native_binding_test WHERE id = 14")
+    await pool.execute("INSERT INTO native_binding_test (id, j) VALUES ($1, $2)", [14, deep])
+    got = (await pool.query_one("SELECT j FROM native_binding_test WHERE id = 14"))["j"]
+    assert got == deep, "100-level nested JSON"
+
+    # === memoryview binds as BYTEA (repr must never leak in as TEXT) ===
+    await pool.execute("DELETE FROM native_binding_test WHERE id = 15")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, data) VALUES ($1, $2)",
+        [15, memoryview(b"through memoryview")],
+    )
+    got = (await pool.query_one("SELECT data FROM native_binding_test WHERE id = 15"))["data"]
+    assert got == b"through memoryview", got
+
+    # === A JSON parameter nested past the guard fails loudly (no stack
+    # overflow / abort), and an object with a self-referential dict too ===
+    beyond = current = {}
+    for _ in range(200):
+        current["child"] = {}
+        current = current["child"]
+    try:
+        await pool.execute("INSERT INTO native_binding_test (id, j) VALUES ($1, $2)", [99, beyond])
+        raise AssertionError("expected DataError for over-deep JSON nesting")
+    except PostPyro.DataError:
+        pass
+
+    selfref = {}
+    selfref["self"] = selfref
+    try:
+        await pool.execute("INSERT INTO native_binding_test (id, j) VALUES ($1, $2)", [99, selfref])
+        raise AssertionError("expected DataError for a self-referential dict")
+    except PostPyro.DataError:
+        pass
+
+    # === Mixed naive + aware datetimes in one call to the same SQL text
+    # must not poison sqlx's prepared-statement cache (TIMESTAMP vs
+    # TIMESTAMPTZ wire types for one parameter slot) ===
+    await pool.execute("DELETE FROM native_binding_test WHERE id IN (16, 17)")
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, tstz) VALUES ($1, $2)",
+        [16, datetime.datetime(2024, 3, 15, 10, 30, 0, tzinfo=datetime.timezone.utc)],
+    )
+    # Same SQL text, now naive (different wire type, same parameter slot).
+    # With the non-persistent fix this re-prepares; without it Postgres
+    # rejects the bind or silently misreads the value.
+    await pool.execute(
+        "INSERT INTO native_binding_test (id, tstz) VALUES ($1, $2)",
+        [17, datetime.datetime(2024, 3, 16, 10, 30, 0)],
+    )
+    got16 = (await pool.query_one("SELECT tstz FROM native_binding_test WHERE id = 16"))["tstz"]
+    got17 = (await pool.query_one("SELECT tstz FROM native_binding_test WHERE id = 17"))["tstz"]
+    assert got16 == datetime.datetime(2024, 3, 15, 10, 30, 0, tzinfo=datetime.timezone.utc), got16
+    # Naive into timestamptz is interpreted in the session zone (UTC here).
+    assert got17 == datetime.datetime(2024, 3, 16, 10, 30, 0, tzinfo=datetime.timezone.utc), got17
+
     # === Loud failures, not silent corruption ===
     # A time with tzinfo has no native TIME mapping - NotSupportedError, not
     # a silent wall-clock interpretation.

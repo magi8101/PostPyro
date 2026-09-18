@@ -331,7 +331,26 @@ text:
 | `uuid.UUID`                                            | `UUID`                            |
 | `decimal.Decimal`                                      | `NUMERIC` (exact)                 |
 | `dict`, `list`, `tuple`                                | `JSON`/`JSONB`                    |
-| `bytes`, `bytearray`                                   | `BYTEA`                           |
+| `bytes`, `bytearray`, `memoryview`                     | `BYTEA`                           |
+
+**Lists bind as JSON, not Postgres arrays.** This keeps dict/list/tuple
+symmetric with `json.dumps` and matches the JSON read side. To bind a
+Postgres *array* instead, stringify the list and cast in the SQL text:
+
+```python
+await pool.query("SELECT * FROM scores WHERE id = ANY($1::int4[])", ["{1,2,3}"])
+# or, for a TEXT[]:
+await pool.execute("INSERT INTO tags (names) VALUES ($1::text[])", ["{'a','b'}"])
+```
+
+Two intentional limitations, both loud rather than silent: a
+`datetime.time` carrying `tzinfo` raises `NotSupportedError` (Postgres
+`TIMETZ` is legacy; bind a TIMESTAMPTZ datetime instead), and JSON params
+nested deeper than 128 levels raise `DataError` (a self-referential dict
+would otherwise overflow the Rust stack - an abort, not an exception).
+`Decimal("NaN")`/`Decimal("Infinity")` are also rejected (Postgres NUMERIC
+accepts `NaN`, but BigDecimal has no such values - bind the string
+`'NaN'::numeric` if you need it).
 
 `int` still binds as `BIGINT` regardless of magnitude - cast in SQL
 (`$1::int4`) when a narrower column needs an exact match. Anything not in
