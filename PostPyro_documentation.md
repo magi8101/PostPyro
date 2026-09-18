@@ -498,7 +498,18 @@ await users.save("Alice", "alice@example.com")
 - **Async I/O**: `sqlx`'s async networking releases the GIL during I/O instead of blocking the whole process
 - **Binary protocol**: query results come back over Postgres's binary wire protocol, parsed in Rust
 
-The performance comparisons published for earlier (pre-rewrite, synchronous) versions of PostPyro no longer apply to this async driver and have not been re-benchmarked yet; treat any such numbers you find elsewhere as stale. `benchmarks/` has a harness that runs real timing against PostPyro, asyncpg, and psycopg on your own Postgres - run it yourself rather than trusting a number posted here, see `benchmarks/README.md`.
+The performance comparisons published for earlier (pre-rewrite, synchronous) versions of PostPyro no longer apply to this async driver. `benchmarks/` has a harness (`bench_vs_alternatives.py`) that runs real timing against PostPyro, asyncpg, and psycopg on your own Postgres.
+
+Most recent maintainer run (one machine, one Docker Postgres 16, one point in time - not a claim about your hardware or workload; `REPEATS=5`, median reported):
+
+| Benchmark                                | PostPyro (ms) | asyncpg (ms) | psycopg3 (ms) |
+| ----------------------------------------- | -------------: | ------------: | -------------: |
+| Round trip (200x `SELECT 1`)              |          29.86 |         20.74 |          17.19 |
+| Bulk insert (1,000 rows, one at a time)   |        4304.05 |       4475.53 |        4171.60 |
+| Transaction (4 statements)                |           8.90 |          4.85 |           4.13 |
+| Concurrency (20 tasks via `asyncio.gather`) |          2.81 |          1.16 |           3.91 |
+
+Read plainly, not favorably: PostPyro is currently slower than both on plain round-trips and transactions, roughly on par on bulk inserts, and behind asyncpg but ahead of psycopg3 on concurrency. This is not a "PostPyro is faster" story - no optimization pass has happened yet on the async rewrite; stabilizing the API and correctness came first. Run the harness yourself for numbers that matter to a real decision; see `benchmarks/README.md`.
 
 ## Advanced Usage
 
