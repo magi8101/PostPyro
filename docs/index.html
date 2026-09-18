@@ -607,11 +607,19 @@ async with tx:
                     <h2 class="section-title">Performance</h2>
                 </div>
 
+                <div class="callout">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                        <p class="callout-title">Not a speed claim</p>
+                        <p>The architecture below is real, but asyncpg and psycopg3 are compiled too (Cython/C), so "no Python interpreter overhead" isn't a PostPyro-only advantage. The numbers underneath are from one machine, one Docker Postgres 16, one point in time - not a claim about your hardware or workload. Run <code>benchmarks/bench_vs_alternatives.py</code> yourself before trusting any number here - see <code>benchmarks/README.md</code>.</p>
+                    </div>
+                </div>
+
                 <div class="performance-reasons">
                     <div class="reason">
                         <div class="reason-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
                         <h4>Rust backend</h4>
-                        <p>Native performance without Python interpreter overhead.</p>
+                        <p>Query execution and type conversion happen in compiled Rust, not interpreted Python.</p>
                     </div>
                     <div class="reason">
                         <div class="reason-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg></div>
@@ -629,6 +637,20 @@ async with tx:
                         <p>No external Python packages required at runtime.</p>
                     </div>
                 </div>
+
+                <h3 class="section-title" style="font-size: 1.25rem; margin-bottom: var(--space-lg);">Measured results</h3>
+                <div class="comparison-wrap" style="margin-bottom: var(--space-2xl);">
+                    <table>
+                        <thead><tr><th>Benchmark</th><th>PostPyro (median ms)</th><th>asyncpg (median ms)</th><th>psycopg3 (median ms)</th></tr></thead>
+                        <tbody>
+                            <tr><td>Round trip (200&times; <code>SELECT 1</code>)</td><td>29.86</td><td>20.74</td><td>17.19</td></tr>
+                            <tr><td>Bulk insert (1,000 rows, one at a time)</td><td>4304.05</td><td>4475.53</td><td>4171.60</td></tr>
+                            <tr><td>Transaction (4 statements)</td><td>8.90</td><td>4.85</td><td>4.13</td></tr>
+                            <tr><td>Concurrency (20 tasks via <code>asyncio.gather</code>)</td><td>2.81</td><td>1.16</td><td>3.91</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="section-description" style="margin-bottom: var(--space-2xl);">PostPyro is currently slower than both on plain round-trips and transactions, roughly on par on bulk inserts, and behind asyncpg but ahead of psycopg3 on concurrency. No optimization pass has happened yet - see <a href="https://github.com/magi8101/PostPyro/blob/master/benchmarks/README.md" target="_blank" rel="noopener">benchmarks/README.md</a> for the exact methodology and how to reproduce this.</p>
 
                 <h3 class="section-title" style="font-size: 1.25rem; margin-bottom: var(--space-lg);">Driver comparison</h3>
                 <div class="comparison-wrap">
