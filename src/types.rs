@@ -2,8 +2,10 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use pyo3::prelude::*;
 use pyo3::sync::GILOnceCell;
-use pyo3::types::PyMemoryView;
-use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+use pyo3::types::{
+    PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString,
+    PyTuple,
+};
 use sqlx::postgres::PgRow;
 use sqlx::postgres::types::Oid;
 use sqlx::{Column, Postgres, Row as SqlxRow, TypeInfo};
@@ -27,6 +29,7 @@ static PY_DATE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 static PY_TIME: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 static PY_UUID: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 static PY_DECIMAL: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static PY_MEMORYVIEW: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
 fn py_class<'py>(
     py: Python<'py>,
@@ -117,12 +120,7 @@ fn py_to_json_depth(obj: &PyAny, depth: usize) -> PyResult<serde_json::Value> {
         }
         Ok(serde_json::Value::Object(map))
     } else {
-        let type_name = obj
-            .get_type()
-            .name()
-            .ok()
-            .and_then(|n| n.to_str().ok())
-            .unwrap_or("unknown");
+        let type_name = obj.get_type().name().ok().unwrap_or("unknown");
         Err(DataError::new_err(format!(
             "cannot bind a {} object to a JSON/JSONB parameter - pass a dict/list/tuple/str/int/float/bool/None",
             type_name
@@ -166,16 +164,24 @@ impl<'q> sqlx::Encode<'q, Postgres> for UnspecifiedNull {
     }
 }
 
-/// Read an int attribute off a Python object (e.g. `dt.year`, `d.month`).
+/// Read an int attribute off a Python object (e.g. `dt.year`, which chrono
+/// takes as `i32` since it can be negative/large).
 fn get_int_attr(obj: &PyAny, attr: &str) -> PyResult<i32> {
     obj.getattr(attr)?.extract::<i32>()
+}
+
+/// Read an int attribute chrono takes as `u32` (month/day/hour/minute/
+/// second/microsecond - all non-negative by construction on a real
+/// `date`/`time`/`datetime` instance).
+fn get_uint_attr(obj: &PyAny, attr: &str) -> PyResult<u32> {
+    obj.getattr(attr)?.extract::<u32>()
 }
 
 /// Which Postgres temporal type a Python `datetime.datetime` binds as:
 /// naive wall-clock -> TIMESTAMP, timezone-aware -> TIMESTAMPTZ (instant
 /// normalized to UTC). Splitting them keeps the wire type matching the
 /// column type instead of relying on the server's implicit
-timestamptz->timestamp cast under the session timezone.
+/// timestamptz->timestamp cast under the session timezone.
 enum PyDateTimeParam {
     Timestamp(NaiveDateTime),
     Timestamptz(DateTime<Utc>),
@@ -194,15 +200,15 @@ fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
     let naive = NaiveDateTime::new(
         NaiveDate::from_ymd_opt(
             get_int_attr(obj, "year")?,
-            get_int_attr(obj, "month")?,
-            get_int_attr(obj, "day")?,
+            get_uint_attr(obj, "month")?,
+            get_uint_attr(obj, "day")?,
         )
         .ok_or_else(|| DataError::new_err("invalid date component in datetime parameter"))?,
         NaiveTime::from_hms_micro_opt(
-            get_int_attr(obj, "hour")?,
-            get_int_attr(obj, "minute")?,
-            get_int_attr(obj, "second")?,
-            get_int_attr(obj, "microsecond")?,
+            get_uint_attr(obj, "hour")?,
+            get_uint_attr(obj, "minute")?,
+            get_uint_attr(obj, "second")?,
+            get_uint_attr(obj, "microsecond")?,
         )
         .ok_or_else(|| DataError::new_err("invalid time component in datetime parameter"))?,
     );
@@ -231,8 +237,8 @@ fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
 fn py_date_to_chrono(obj: &PyAny) -> PyResult<NaiveDate> {
     NaiveDate::from_ymd_opt(
         get_int_attr(obj, "year")?,
-        get_int_attr(obj, "month")?,
-        get_int_attr(obj, "day")?,
+        get_uint_attr(obj, "month")?,
+        get_uint_attr(obj, "day")?,
     )
     .ok_or_else(|| DataError::new_err("invalid date parameter"))
 }
@@ -240,10 +246,10 @@ fn py_date_to_chrono(obj: &PyAny) -> PyResult<NaiveDate> {
 /// Python `datetime.time` -> `chrono::NaiveTime`.
 fn py_time_to_chrono(obj: &PyAny) -> PyResult<NaiveTime> {
     let t = NaiveTime::from_hms_micro_opt(
-        get_int_attr(obj, "hour")?,
-        get_int_attr(obj, "minute")?,
-        get_int_attr(obj, "second")?,
-        get_int_attr(obj, "microsecond")?,
+        get_uint_attr(obj, "hour")?,
+        get_uint_attr(obj, "minute")?,
+        get_uint_attr(obj, "second")?,
+        get_uint_attr(obj, "microsecond")?,
     )
     .ok_or_else(|| DataError::new_err("invalid time parameter"))?;
     // A time with tzinfo != None binds as its naive wall-clock value; Postgres
@@ -361,7 +367,18 @@ pub fn bind_params<'q>(
         } else if obj_ref.downcast::<PyDict>().is_ok()
             || obj_ref.downcast::<PyList>().is_ok()
             || obj_ref.downcast::<PyTuple>().is_ok()
+            || obj_ref.downcast::<PySet>().is_ok()
+            || obj_ref.downcast::<PyFrozenSet>().is_ok()
         {
+            // set/frozenset route through py_to_json purely to hit its
+            // existing "not JSON-mappable" error arm with the right message
+            // - neither ever succeeds here, since py_to_json has no match
+            // arm for either. Without this, a bare set/frozenset parameter
+            // fell through to the str(obj) TEXT fallback below instead of
+            // raising - silently binding e.g. "{1, 2, 3}" as text, which
+            // then corrupts a prepared statement already cached with a
+            // JSONB-typed placeholder for the same SQL text (Postgres:
+            // "unsupported jsonb version number", not a catchable DataError).
             let json = py_to_json(obj_ref)?;
             query = query.bind(json)
         } else if let Ok(b) = obj_ref.downcast::<PyBytes>() {
@@ -374,11 +391,16 @@ pub fn bind_params<'q>(
             // holding the borrow across sqlx's async encode path could race
             // a concurrent Python-side resize of the same bytearray.
             query = query.bind(b.to_vec())
-        } else if let Ok(m) = obj_ref.downcast::<PyMemoryView>() {
+        } else if py_isinstance(py, obj_ref, &PY_MEMORYVIEW, "builtins", "memoryview")? {
             // memoryview sits next to bytes/bytearray in users' minds;
             // letting it fall through to the TEXT fallback would silently
-            // bind the repr ("<memory at 0x...>") as the value.
-            query = query.bind(m.extract::<Vec<u8>>()?)
+            // bind the repr ("<memory at 0x...>") as the value. pyo3 0.20
+            // has no typed `PyMemoryView` wrapper, so go through the same
+            // isinstance + method-call route as datetime/uuid/decimal above:
+            // `tobytes()` is a real memoryview method, no buffer-protocol
+            // API (also abi3-restricted) needed.
+            let b = obj_ref.call_method0("tobytes")?;
+            query = query.bind(b.downcast::<PyBytes>()?.as_bytes().to_vec())
         } else {
             let s = obj_ref.str()?.extract::<String>()?;
             query = query.bind(s)
@@ -424,6 +446,17 @@ fn decode_uuid(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject> {
     let value: Option<Uuid> = row.try_get(idx).map_err(map_db_error)?;
     Ok(value
         .map(|u| u.to_string().into_py(py))
+        .unwrap_or_else(|| py.None()))
+}
+
+/// BYTEA -> Python `bytes`. Not `decode_scalar::<Vec<u8>>` - pyo3's generic
+/// `IntoPy` for `Vec<u8>` produces a Python `list` of ints (each byte boxed
+/// as its own `int` object), not a `bytes` object; `PyBytes::new` is the
+/// actual `bytes` conversion.
+fn decode_bytea(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject> {
+    let value: Option<Vec<u8>> = row.try_get(idx).map_err(map_db_error)?;
+    Ok(value
+        .map(|b| pyo3::types::PyBytes::new(py, &b).into_py(py))
         .unwrap_or_else(|| py.None()))
 }
 
@@ -562,7 +595,7 @@ pub fn pg_value_to_py(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject>
         "FLOAT4" => decode_scalar::<f32>(py, row, idx),
         "FLOAT8" => decode_scalar::<f64>(py, row, idx),
         "TEXT" | "VARCHAR" | "CHAR" | "BPCHAR" | "NAME" => decode_scalar::<String>(py, row, idx),
-        "BYTEA" => decode_scalar::<Vec<u8>>(py, row, idx),
+        "BYTEA" => decode_bytea(py, row, idx),
         "NUMERIC" => decode_numeric(py, row, idx),
         "UUID" => decode_uuid(py, row, idx),
         "TIMESTAMP" => decode_timestamp(py, row, idx),
