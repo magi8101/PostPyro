@@ -86,7 +86,7 @@ class Pool:
     """An async connection pool (`sqlx::PgPool`); obtain via the module-level `connect()`, never constructed directly."""
 
     async def execute(self, query: str, params: Optional[List[Any]] = None) -> int:
-        """Runs a statement on a pooled connection and returns rows affected. `None` params bind as untyped SQL NULL, inferred from context."""
+        """Runs a statement on a pooled connection and returns rows affected. `bool`/`int`/`float`/`str`/`None`/`datetime`/`date`/`time`/`uuid.UUID`/`Decimal`/`dict`/`list`/`tuple`/`bytes`/`bytearray` params bind natively with the right Postgres wire type (naive datetime as TIMESTAMP, tz-aware as TIMESTAMPTZ, dict/list as JSON); other objects fall back to `str()` as TEXT."""
         ...
     async def query(self, query: str, params: Optional[List[Any]] = None) -> List[Row]:
         """Runs a query on a pooled connection and returns all matching rows."""

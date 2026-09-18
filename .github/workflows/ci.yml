@@ -81,6 +81,7 @@ jobs:
           python3 tests/pool_and_row.py
           python3 tests/transaction.py
           python3 tests/type_conversion_bugs.py
+          python3 tests/native_binding.py
 
       - name: Concurrency correctness harness (live Postgres)
         run: python3 benchmarks/bench_concurrency_correctness.py

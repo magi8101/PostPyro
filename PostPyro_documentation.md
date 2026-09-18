@@ -8,7 +8,7 @@ PostPyro is an async PostgreSQL driver for Python built with PyO3/`pyo3-asyncio`
 
 This is the full reference - every method, type, and exception. If you just want a query running, [`README.md`](README.md) has a shorter quick start.
 
-PostPyro runs `sqlx`'s binary protocol under PyO3, so every `await` releases the GIL for the duration of the wait instead of blocking the interpreter. Rust's ownership system rules out the memory-safety bugs (leaks, segfaults) that hand-rolled C bindings are prone to. TLS is available through `sqlx`'s `rustls` backend, and errors surface through a DB-API 2.0-flavored exception hierarchy rather than raw `sqlx` errors. The type system covers booleans, integers, floats, `NUMERIC`, text, dates/times, UUIDs, and JSON/JSONB automatically - see the [type table](#supported-type-conversions) for exactly what's decodable today (arrays, `BYTEA`, and network types aren't yet).
+PostPyro runs `sqlx`'s binary protocol under PyO3, so every `await` releases the GIL for the duration of the wait instead of blocking the interpreter. Rust's ownership system rules out the memory-safety bugs (leaks, segfaults) that hand-rolled C bindings are prone to. TLS is available through `sqlx`'s `rustls` backend, and errors surface through a DB-API 2.0-flavored exception hierarchy rather than raw `sqlx` errors. The type system covers booleans, integers, floats, `NUMERIC`, text, dates/times, UUIDs, and JSON/JSONB automatically - see the [type table](#supported-type-conversions) for exactly what's decodable today (arrays and network types aren't yet).
 
 ## Installation
 
@@ -309,39 +309,62 @@ PostPyro automatically converts between Python and PostgreSQL types.
 | `TIMESTAMPTZ`                         | `datetime.datetime`   | With timezone info (UTC)                       |
 | `UUID`                                | `str`                 | `'550e8400-e29b-41d4-a716-446655440000'`       |
 | `JSON`, `JSONB`                       | `dict`, `list`, etc.  | `{"key": "value"}`, `[1, 2, 3]`                |
+| `BYTEA`                               | `bytes`               | `b"\\x00\\x01"`                                |
 
-Any other type (`BYTEA`, arrays, `INET`/`CIDR`, custom/enum types, etc.) isn't
-decodable yet - reading such a column raises `PostPyro.NotSupportedError`
-naming the type, rather than silently returning the wrong value or `None`.
+### Binding Parameters
+
+Parameters auto-convert both directions for the table above - you can pass
+Python values **and** bind them natively, with no `$1::type` cast in the SQL
+text:
+
+| Python parameter                                      | Binds as                          |
+| ------------------------------------------------------ | --------------------------------- |
+| `bool`                                                 | `BOOLEAN`                         |
+| `int`                                                  | `BIGINT`                          |
+| `float`                                                | `DOUBLE PRECISION`                |
+| `str`                                                  | `TEXT`                            |
+| `None`                                                 | untyped `NULL` (server infers)    |
+| `datetime.datetime` (naive)                            | `TIMESTAMP`                       |
+| `datetime.datetime` (tz-aware)                         | `TIMESTAMPTZ` (normalized to UTC) |
+| `datetime.date`                                        | `DATE`                            |
+| `datetime.time` (naive)                                | `TIME`                            |
+| `uuid.UUID`                                            | `UUID`                            |
+| `decimal.Decimal`                                      | `NUMERIC` (exact)                 |
+| `dict`, `list`, `tuple`                                | `JSON`/`JSONB`                    |
+| `bytes`, `bytearray`                                   | `BYTEA`                           |
+
+`int` still binds as `BIGINT` regardless of magnitude - cast in SQL
+(`$1::int4`) when a narrower column needs an exact match. Anything not in
+this table (e.g. a `set`, or an `INET` value) falls back to `str(obj)` as
+`TEXT` - pass those as strings with an explicit cast (`$1::inet`).
 
 ### Type Usage Example
 
-Binding parameters only auto-converts `bool`/`int`/`float`/`str`/`None` -
-anything else (a `date`, `datetime`, `uuid.UUID`, `dict`, ...) has no
-automatic Python→Postgres conversion. Pass it as a string and add an
-explicit Postgres cast in the SQL text instead:
+Binding parameters auto-converts everything in the table above - pass real
+Python objects (`datetime`, `uuid.UUID`, `Decimal`, `dict`, `bytes`, ...) and
+PostPyro sends them with the right Postgres wire type. A string-plus-cast
+(`"2023-12-25"` + `$5::date`) also still works when you already have text:
 
 ```python
-import json
 import uuid
-from datetime import date
+from datetime import datetime, date
+from decimal import Decimal
 
-# Insert various types - non-primitive values go in as strings, with an
-# explicit ::type cast telling Postgres what to parse them as.
+# Native objects bind directly - no ::type casts needed:
 await pool.execute("""
     INSERT INTO mixed_types (
         bool_col, int_col, float_col, text_col,
         date_col, timestamp_col, uuid_col, json_col
-    ) VALUES ($1, $2, $3, $4, $5::date, $6::timestamp, $7::uuid, $8::jsonb)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 """, [
-    True,                                     # boolean - auto-converted
-    42,                                       # integer - auto-converted
-    3.14159,                                  # float - auto-converted
-    "Hello PostgreSQL",                       # text - auto-converted
-    "2023-12-25",                             # date - string + ::date cast
-    "2023-12-25 14:30:00",                    # timestamp - string + ::timestamp cast
-    str(uuid.uuid4()),                        # uuid - string + ::uuid cast
-    json.dumps({"name": "John", "scores": [85, 92, 78]}),  # json - string + ::jsonb cast
+    True,                                      # boolean - auto-converted
+    42,                                        # integer - auto-converted
+    3.14159,                                   # float - auto-converted
+    "Hello PostgreSQL",                        # text - auto-converted
+    date(2023, 12, 25),                        # date - native
+    datetime(2023, 12, 25, 14, 30),            # timestamp - native (naive)
+    uuid.uuid4(),                              # uuid - native
+    {"name": "John", "scores": [85, 92, 78]},  # json/jsonb - native
 ])
 
 # Reading back decodes to the right Python type automatically (this
