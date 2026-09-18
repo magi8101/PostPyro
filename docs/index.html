@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PostPyro - Async PostgreSQL Driver for Python</title>
+    <title>PostPyro — Async PostgreSQL Driver for Python</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff6a3d'><path d='M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 1 0 3 2 3 6a8 8 0 0 1-16 0c0-5 4-7 5-10 0 2 1 3 3 0z'/></svg>">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
-                <span class="logo">🔥</span>
+                <svg class="brand-mark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 1 0 3 2 3 6a8 8 0 0 1-16 0c0-5 4-7 5-10 0 2 1 3 3 0z"/></svg>
                 <span class="brand-name">PostPyro</span>
-                <span class="version">v2.0.0-dev</span>
+                <span class="version-badge">v2.0.0-dev</span>
             </div>
             <ul class="nav-menu">
                 <li><a href="#overview" class="nav-link">Overview</a></li>
@@ -26,74 +26,70 @@
                 <li><a href="#api-reference" class="nav-link">API Reference</a></li>
                 <li><a href="#examples" class="nav-link">Examples</a></li>
                 <li><a href="#performance" class="nav-link">Performance</a></li>
-                <li class="nav-item-github">
-                    <a href="https://github.com/magi8101/PostPyro" target="_blank" class="github-link">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                        </svg>
-                        GitHub
-                    </a>
-                </li>
             </ul>
-            <div class="hamburger">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
+            <div class="nav-actions">
+                <label class="nav-search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                    <input type="text" id="doc-search" placeholder="Search docs...">
+                    <kbd>⌘K</kbd>
+                </label>
+                <a href="https://github.com/magi8101/PostPyro" target="_blank" rel="noopener" class="icon-link" title="GitHub">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                </a>
+                <button class="hamburger" aria-label="Toggle menu">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </button>
             </div>
         </div>
     </nav>
 
-    <main class="main-content">
-        <!-- Hero Section -->
+    <main>
+        <!-- Hero -->
         <section class="hero" id="overview">
             <div class="container">
                 <div class="hero-content">
-                    <h1 class="hero-title">
-                        <span class="gradient-text">PostPyro</span>
-                    </h1>
-                    <p class="hero-subtitle">
-                        Async PostgreSQL Driver for Python, Built with Rust
-                    </p>
+                    <span class="eyebrow">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        Beta — async rewrite, breaking changes expected before 1.0
+                    </span>
+                    <h1 class="hero-title">Async PostgreSQL for Python, built in Rust</h1>
                     <p class="hero-description">
-                        Built with PyO3 and sqlx, PostPyro is a fully async driver - every I/O method is
-                        <code>async def</code> and releases the GIL while waiting on Postgres - with
-                        DB-API 2.0-flavored exception handling.
+                        PostPyro wraps <code>sqlx</code> in a PyO3/<code>pyo3-asyncio</code> binding. Every I/O method
+                        is <code>async def</code> and releases the GIL while waiting on Postgres, parameters bind
+                        natively — datetimes, UUIDs, <code>Decimal</code>, JSON, arrays, bytes — and errors surface
+                        through a DB-API 2.0-flavored exception hierarchy.
                     </p>
                     <div class="hero-actions">
-                        <a href="#installation" class="btn btn-primary">Get Started</a>
-                        <a href="https://pypi.org/project/PostPyro/" target="_blank" class="btn btn-secondary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                            </svg>
-                            PyPI Package
+                        <a href="#installation" class="btn btn-primary">Get started</a>
+                        <a href="https://pypi.org/project/PostPyro/" target="_blank" rel="noopener" class="btn btn-secondary">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                            PyPI package
                         </a>
                     </div>
-                    <div class="hero-stats">
-                        <div class="stat">
-                            <span class="stat-number">🔥</span>
-                            <span class="stat-label">Rust Powered</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">⚡</span>
-                            <span class="stat-label">High Performance</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">🛡️</span>
-                            <span class="stat-label">Memory Safe</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">📦</span>
-                            <span class="stat-label">Zero Dependencies</span>
-                        </div>
+                    <div class="hero-meta">
+                        <span class="hero-meta-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Memory-safe Rust core
+                        </span>
+                        <span class="hero-meta-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+                            Fully async, GIL released on I/O
+                        </span>
+                        <span class="hero-meta-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                            Zero Python dependencies
+                        </span>
                     </div>
                 </div>
                 <div class="hero-code">
                     <div class="code-window">
                         <div class="code-header">
                             <div class="code-dots">
-                                <span class="dot red"></span>
-                                <span class="dot yellow"></span>
-                                <span class="dot green"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
                             </div>
                             <span class="code-title">quick_example.py</span>
                         </div>
@@ -102,24 +98,19 @@
 import PostPyro
 
 async def main():
-    # Connect to PostgreSQL (returns a Pool)
     pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
 
-    # Query data
-    users = await pool.query("SELECT * FROM users WHERE active = $1", [True])
+    users = await pool.query(
+        "SELECT * FROM users WHERE active = $1", [True]
+    )
     for user in users:
         print(f"User: {user['name']} ({user['email']})")
 
-    # Execute updates
-    affected = await pool.execute(
-        "UPDATE users SET last_login = NOW() WHERE id = $1",
-        [user_id]
-    )
-
-    # Use transactions
     tx = await pool.transaction()
     async with tx:
-        await tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [user_id])
+        await tx.execute(
+            "INSERT INTO orders (user_id) VALUES ($1)", [user_id]
+        )
         await tx.execute("UPDATE inventory SET stock = stock - 1")
 
     await pool.close()
@@ -131,89 +122,93 @@ asyncio.run(main())</code></pre>
             </div>
         </section>
 
-        <!-- Features Section -->
-        <section class="features">
+        <!-- Features -->
+        <section id="features">
             <div class="container">
-                <h2 class="section-title">Key Features</h2>
+                <div class="section-header">
+                    <h2 class="section-title">Key features</h2>
+                    <p class="section-description">Everything the driver handles for you, out of the box.</p>
+                </div>
                 <div class="features-grid">
                     <div class="feature-card">
-                        <div class="feature-icon">🔥</div>
-                        <h3 class="feature-title">Rust Core</h3>
-                        <p class="feature-description">
-                            The driver itself is a PyO3 extension module - query execution and type
-                            conversion happen in compiled Rust, not interpreted Python.
-                        </p>
+                        <div class="feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        </div>
+                        <h3 class="feature-title">Rust core</h3>
+                        <p class="feature-description">The driver is a PyO3 extension module — query execution and type conversion happen in compiled Rust, not interpreted Python.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🛡️</div>
-                        <h3 class="feature-title">Memory Safe</h3>
-                        <p class="feature-description">
-                            Rust's ownership system prevents memory leaks and segfaults.
-                        </p>
+                        <div class="feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </div>
+                        <h3 class="feature-title">Memory safe</h3>
+                        <p class="feature-description">Rust's ownership system rules out the leaks and segfaults hand-rolled C bindings are prone to.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🌐</div>
-                        <h3 class="feature-title">Broad Type Support</h3>
-                        <p class="feature-description">
-                            Booleans, integers, floats, numeric, text, dates/times, UUIDs, and JSON/JSONB
-                            convert automatically. See the Type System reference below for the full list.
-                        </p>
+                        <div class="feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+                        </div>
+                        <h3 class="feature-title">Broad type support</h3>
+                        <p class="feature-description">Booleans, numerics, text, dates/times, UUIDs, <code>Decimal</code>, JSON/JSONB, <code>BYTEA</code>, and arrays convert automatically — see the <a href="#api-types">type reference</a>.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">⚡</div>
-                        <h3 class="feature-title">Fully Async</h3>
-                        <p class="feature-description">
-                            Every I/O method is <code>async def</code>, built on sqlx's connection pooling
-                            and Tokio runtime, and releases the GIL while waiting on Postgres.
-                        </p>
+                        <div class="feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+                        </div>
+                        <h3 class="feature-title">Fully async</h3>
+                        <p class="feature-description">Every I/O method is <code>async def</code>, built on sqlx's pooling and the Tokio runtime, releasing the GIL while waiting on Postgres.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🔒</div>
-                        <h3 class="feature-title">Type Conversion</h3>
-                        <p class="feature-description">
-                            Postgres values decode to native Python types automatically. Bound parameters other than
-                            <code>bool</code>/<code>int</code>/<code>float</code>/<code>str</code>/<code>None</code> need
-                            an explicit <code>::type</code> cast in the SQL text - see the <a href="#api-types">Type System reference</a> below.
-                        </p>
+                        <div class="feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </div>
+                        <h3 class="feature-title">Native parameter binding</h3>
+                        <p class="feature-description"><code>datetime</code>, <code>uuid.UUID</code>, <code>Decimal</code>, <code>dict</code>, homogeneous <code>list</code>/<code>tuple</code> (as a real array), and <code>bytes</code> bind directly — no manual <code>::type</code> cast in the SQL text.</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">🎯</div>
-                        <h3 class="feature-title">DB-API 2.0 Compliant</h3>
-                        <p class="feature-description">
-                            Standard Python database interface ensures compatibility with existing code.
-                        </p>
+                        <div class="feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+                        </div>
+                        <h3 class="feature-title">DB-API 2.0 exceptions</h3>
+                        <p class="feature-description">Standard exception hierarchy (<code>IntegrityError</code>, <code>OperationalError</code>, ...) mapped from Postgres SQLSTATE codes.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Installation Section -->
-        <section class="installation" id="installation">
+        <!-- Installation -->
+        <section id="installation">
             <div class="container">
-                <h2 class="section-title">Installation</h2>
-                <div class="requirements" style="margin-bottom: var(--space-xl);">
-                    <h4>⚠️ Pre-release</h4>
-                    <p>
-                        This page documents the async 2.0.0-dev API (<code>python/PostPyro/__init__.pyi</code>
-                        in the repo). It hasn't been published to PyPI yet - <code>pip install PostPyro</code>
-                        currently installs the older, synchronous 1.0.0 driver, which does not have this API.
-                        Build from source (below) to use the async driver described here.
-                    </p>
+                <div class="section-header">
+                    <h2 class="section-title">Installation</h2>
                 </div>
-                <div class="installation-content">
-                    <div class="install-method">
-                        <h3 class="install-title">📦 Install from PyPI (1.0.0, sync - not this API)</h3>
+
+                <div class="callout">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                        <p class="callout-title">Pre-release</p>
+                        <p>This page documents the async 2.0.0-dev API (<code>python/PostPyro/__init__.pyi</code> in the repo). It hasn't shipped to PyPI yet — <code>pip install PostPyro</code> currently installs the older, synchronous 1.0.0 driver, which doesn't have this API. Build from source below to use the async driver described here.</p>
+                    </div>
+                </div>
+
+                <div class="install-grid">
+                    <div class="install-card">
+                        <h3 class="install-title">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                            From PyPI (1.0.0, sync — not this API)
+                        </h3>
                         <div class="code-block">
                             <pre><code class="language-bash">pip install PostPyro</code></pre>
-                            <button class="copy-btn" onclick="copyToClipboard('pip install PostPyro')">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                                </svg>
+                            <button class="copy-btn" data-copy="pip install PostPyro" title="Copy">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                             </button>
                         </div>
                     </div>
-                    <div class="install-method">
-                        <h3 class="install-title">🔧 Build from Source</h3>
+                    <div class="install-card">
+                        <h3 class="install-title">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                            Build from source (async, this API)
+                        </h3>
                         <div class="code-block">
                             <pre><code class="language-bash"># Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -222,20 +217,16 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 git clone https://github.com/magi8101/PostPyro.git
 cd PostPyro
 pip install -e .</code></pre>
-                            <button class="copy-btn" onclick="copyToClipboard(`# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Clone and build
+                            <button class="copy-btn" data-copy="curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 git clone https://github.com/magi8101/PostPyro.git
 cd PostPyro
-pip install -e .`)">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                                </svg>
+pip install -e ." title="Copy">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                             </button>
                         </div>
                     </div>
                 </div>
+
                 <div class="requirements">
                     <h4>Requirements</h4>
                     <ul>
@@ -247,28 +238,26 @@ pip install -e .`)">
             </div>
         </section>
 
-        <!-- Quick Start Section -->
-        <section class="quickstart" id="quickstart">
+        <!-- Quick start -->
+        <section id="quickstart">
             <div class="container">
-                <h2 class="section-title">Quick Start</h2>
-                <div class="quickstart-tabs">
-                    <div class="tab-buttons">
-                        <button class="tab-btn active" onclick="showTab('basic')">Basic Usage</button>
-                        <button class="tab-btn" onclick="showTab('queries')">Queries</button>
-                        <button class="tab-btn" onclick="showTab('transactions')">Transactions</button>
-                        <button class="tab-btn" onclick="showTab('advanced')">Advanced</button>
-                    </div>
-                    
-                    <div class="tab-content active" id="tab-basic">
-                        <div class="code-example">
-                            <pre><code class="language-python">import asyncio
+                <div class="section-header">
+                    <h2 class="section-title">Quick start</h2>
+                </div>
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="basic">Basic usage</button>
+                    <button class="tab-btn" data-tab="queries">Queries</button>
+                    <button class="tab-btn" data-tab="transactions">Transactions</button>
+                    <button class="tab-btn" data-tab="advanced">Native binding</button>
+                </div>
+
+                <div class="tab-content active" id="tab-basic">
+                    <pre><code class="language-python">import asyncio
 import PostPyro
 
 async def main():
-    # Connect to database (returns a Pool)
     pool = await PostPyro.connect("postgresql://user:password@localhost:5432/mydb")
 
-    # Create a table
     await pool.execute("""
         CREATE TABLE users (
             id SERIAL PRIMARY KEY,
@@ -278,837 +267,442 @@ async def main():
         )
     """)
 
-    # Insert data
     affected = await pool.execute(
         "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
         ["Alice", "alice@example.com", 30]
     )
     print(f"Inserted {affected} rows")
 
-    # Close the pool
     await pool.close()
 
 asyncio.run(main())</code></pre>
-                        </div>
-                    </div>
+                </div>
 
-                    <div class="tab-content" id="tab-queries">
-                        <div class="code-example">
-                            <pre><code class="language-python"># Query multiple rows
+                <div class="tab-content" id="tab-queries">
+                    <pre><code class="language-python"># Query multiple rows
 users = await pool.query("SELECT * FROM users WHERE age > $1", [25])
 for user in users:
     print(f"ID: {user['id']}, Name: {user['name']}, Age: {user['age']}")
 
-# Query single row (raises ProgrammingError on zero matches;
-# extra matches beyond the first are silently discarded)
+# Query a single row - raises ProgrammingError on zero matches;
+# extra matches beyond the first are silently discarded
 user = await pool.query_one("SELECT * FROM users WHERE id = $1", [1])
 print(f"Found user: {user['name']}")
 
 # There's no execute_batch() - run each statement individually
-names_and_ages = [("Bob", 25), ("Charlie", 35), ("Diana", 28)]
-inserted = 0
-for name, age in names_and_ages:
-    inserted += await pool.execute(
+for name, age in [("Bob", 25), ("Charlie", 35), ("Diana", 28)]:
+    await pool.execute(
         "INSERT INTO users (name, age) VALUES ($1, $2)", [name, age]
     )
-print(f"Inserted {inserted} rows")
 
-# Pool status check
 if not pool.is_closed():
-    print("✅ Pool is open")</code></pre>
-                        </div>
-                    </div>
+    print("Pool is open")</code></pre>
+                </div>
 
-                    <div class="tab-content" id="tab-transactions">
-                        <div class="code-example">
-                            <pre><code class="language-python"># pool.transaction() is a real BEGIN round-trip, so it must be
+                <div class="tab-content" id="tab-transactions">
+                    <pre><code class="language-python"># pool.transaction() is a real BEGIN round-trip, so it must be
 # awaited before it can be used as a context manager -
 # `async with pool.transaction():` raises TypeError.
 tx = await pool.transaction()
 async with tx:
     await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
     await tx.execute("UPDATE accounts SET balance = balance + 100 WHERE user_id = $1", [1])
-    # Automatically commits on success, rolls back on exception
+    # Commits automatically on success, rolls back on exception
 
-# Manual transaction management (commit()/rollback() also
-# work outside a `with` block)
+# Manual transaction management also works outside a `with` block
 tx = await pool.transaction()
 try:
     await tx.execute("INSERT INTO orders (user_id, amount) VALUES ($1, $2)", [1, 99.99])
-    await tx.execute("UPDATE inventory SET stock = stock - 1 WHERE product_id = $1", [123])
     await tx.commit()
 except Exception as e:
     await tx.rollback()
-    print(f"Transaction failed: {e}")
+    print(f"Transaction failed: {e}")</code></pre>
+                </div>
 
-# Query within a transaction
-tx = await pool.transaction()
-async with tx:
-    users = await tx.query("SELECT * FROM users WHERE created_today = true")
-    for user in users:
-        await tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])</code></pre>
-                        </div>
-                    </div>
-
-                    <div class="tab-content" id="tab-advanced">
-                        <div class="code-example">
-                            <pre><code class="language-python"># bind_params only auto-converts bool/int/float/str/None -
-# anything else (date, datetime, uuid, dict/list for JSON) has
-# to be passed as a string with an explicit Postgres cast.
-import json
+                <div class="tab-content" id="tab-advanced">
+                    <pre><code class="language-python"># Non-primitive types bind natively - no str() + ::type cast needed.
 import uuid
-from datetime import date, datetime
+from datetime import datetime, timezone
+from decimal import Decimal
 
-await pool.execute("""
-    INSERT INTO complex_data (
-        json_col, uuid_col, date_col, timestamp_col
-    ) VALUES ($1::jsonb, $2::uuid, $3::date, $4::timestamp)
-""", [
-    json.dumps({"name": "John", "scores": [85, 92, 78]}),  # JSON
-    str(uuid.uuid4()),                                      # UUID
-    date.today().isoformat(),                               # Date
-    datetime.now().isoformat(),                             # Timestamp
-])
+await pool.execute(
+    "INSERT INTO events (at, uid, price, meta, blob) VALUES ($1,$2,$3,$4,$5)",
+    [
+        datetime.now(timezone.utc),      # -> TIMESTAMPTZ
+        uuid.uuid4(),                    # -> UUID
+        Decimal("9.99"),                 # -> NUMERIC, exact
+        {"ok": True, "tags": ["a", "b"]},# -> JSONB
+        b"\x00payload",                  # -> BYTEA
+    ],
+)
 
-# Reading back decodes to the right Python type automatically -
-# this direction IS automatic (see the Type System reference below).
+# A homogeneous list/tuple binds as a real Postgres array
+await pool.execute(
+    "INSERT INTO tags (id, names, scores) VALUES ($1, $2, $3)",
+    [1, ["red", "blue"], [10, 20, None]],  # None -> NULL array element
+)
 
-# Convert Row to dict for pandas integration
-import pandas as pd
-rows = await pool.query("SELECT * FROM users")
-df = pd.DataFrame([row.to_dict() for row in rows])</code></pre>
-                        </div>
-                    </div>
+# Reading back decodes to the right Python type automatically
+row = await pool.query_one("SELECT * FROM events WHERE id = $1", [1])
+assert isinstance(row["at"], datetime)</code></pre>
                 </div>
             </div>
         </section>
 
-        <!-- API Reference Section -->
-        <section class="api-reference" id="api-reference">
+        <!-- API reference -->
+        <section id="api-reference">
             <div class="container">
-                <h2 class="section-title">API Reference</h2>
-                <div class="api-nav">
-                    <div class="api-sidebar">
+                <div class="section-header">
+                    <h2 class="section-title">API reference</h2>
+                </div>
+                <div class="api-layout">
+                    <nav class="api-sidebar">
                         <ul class="api-menu">
-                            <li><a href="#api-module" class="api-link">Module Functions</a></li>
-                            <li><a href="#api-connection" class="api-link">Pool Class</a></li>
-                            <li><a href="#api-row" class="api-link">Row Class</a></li>
-                            <li><a href="#api-transaction" class="api-link">Transaction Class</a></li>
-                            <li><a href="#api-errors" class="api-link">Error Handling</a></li>
-                            <li><a href="#api-types" class="api-link">Type System</a></li>
+                            <li><a href="#api-module" class="api-link">Module functions</a></li>
+                            <li><a href="#api-pool" class="api-link">Pool class</a></li>
+                            <li><a href="#api-row" class="api-link">Row class</a></li>
+                            <li><a href="#api-transaction" class="api-link">Transaction class</a></li>
+                            <li><a href="#api-errors" class="api-link">Error handling</a></li>
+                            <li><a href="#api-types" class="api-link">Type system</a></li>
                         </ul>
-                    </div>
+                    </nav>
                     <div class="api-content">
                         <div class="api-section" id="api-module">
-                            <h3 class="api-section-title">Module Functions</h3>
-                            
+                            <h3 class="api-section-title">Module functions</h3>
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await PostPyro.connect(dsn, max_size=10, min_size=0)</code>
-                                </div>
-                                <p class="method-description">
-                                    Create a connection pool. This is the only way to get a <code>Pool</code> -
-                                    there's no synchronous constructor, since establishing the first connection
-                                    is itself async.
-                                </p>
+                                <div class="method-signature"><code class="method-name">await PostPyro.connect(dsn, max_size=10, min_size=0)</code></div>
+                                <p class="method-description">Create a connection pool. This is the only way to get a <code>Pool</code> — there's no synchronous constructor, since establishing the first connection is itself async.</p>
                                 <div class="method-params">
-                                    <h5>Parameters:</h5>
+                                    <h5>Parameters</h5>
                                     <ul>
-                                        <li><code>dsn</code> (str): PostgreSQL connection string</li>
-                                        <li><code>max_size</code> (int, optional): maximum pool connections (default 10)</li>
-                                        <li><code>min_size</code> (int, optional): minimum pool connections (default 0)</li>
+                                        <li><code>dsn</code> (str) — PostgreSQL connection string</li>
+                                        <li><code>max_size</code> (int, optional) — maximum pool connections (default 10)</li>
+                                        <li><code>min_size</code> (int, optional) — minimum pool connections (default 0)</li>
                                     </ul>
                                 </div>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p><code>Pool</code> object</p>
-                                </div>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
+                                    <h5>Example</h5>
                                     <pre><code class="language-python">pool = await PostPyro.connect("postgresql://user:pass@localhost:5432/mydb", max_size=20)</code></pre>
                                 </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">PostPyro.__version__ / .apilevel / .threadsafety / .paramstyle</code>
-                                </div>
-                                <p class="method-description">Module-level constants. No <code>get_version()</code> function - read <code>__version__</code> directly.</p>
+                                <div class="method-signature"><code class="method-name">PostPyro.__version__ / .apilevel / .threadsafety / .paramstyle</code></div>
+                                <p class="method-description">Module-level constants. No <code>get_version()</code> function — read <code>__version__</code> directly.</p>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
+                                    <h5>Example</h5>
                                     <pre><code class="language-python">print(PostPyro.__version__)   # driver version
-print(PostPyro.apilevel)      # "2.0" - DB-API 2.0-flavored
-print(PostPyro.paramstyle)    # "numeric" - uses $1, $2, ... parameters</code></pre>
+print(PostPyro.apilevel)      # "2.0"
+print(PostPyro.paramstyle)    # "numeric" - $1, $2, ... placeholders</code></pre>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="api-section" id="api-connection">
-                            <h3 class="api-section-title">Pool Class</h3>
-                            <p class="section-description">
-                                Obtained via <code>await PostPyro.connect(...)</code>. <code>Pool</code> and the
-                                old <code>ConnectionPool</code> class were unified into this one type - there's
-                                no separate <code>Connection</code> class to construct.
-                            </p>
+                        <div class="api-section" id="api-pool">
+                            <h3 class="api-section-title">Pool class</h3>
+                            <p class="section-description" style="margin-bottom: var(--space-md);">Obtained via <code>await PostPyro.connect(...)</code>. <code>Pool</code> and the old <code>ConnectionPool</code> class were unified — there's no separate <code>Connection</code> class to construct.</p>
 
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await pool.execute(query, params=None)</code>
-                                </div>
-                                <p class="method-description">Execute INSERT, UPDATE, DELETE, or DDL statements.</p>
-                                <div class="method-params">
-                                    <h5>Parameters:</h5>
-                                    <ul>
-                                        <li><code>query</code> (str): SQL query string</li>
-                                        <li><code>params</code> (list, optional): Query parameters using $1, $2, ... placeholders</li>
-                                    </ul>
-                                </div>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p>Number of rows affected (int)</p>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await pool.execute(query, params=None)</code></div>
+                                <p class="method-description">Run INSERT, UPDATE, DELETE, or DDL. Returns the number of affected rows (int).</p>
                                 <div class="method-example">
-                                    <h5>Examples:</h5>
-                                    <pre><code class="language-python"># INSERT
-affected = await pool.execute("INSERT INTO users (name, age) VALUES ($1, $2)", ["Alice", 30])
-
-# UPDATE
-affected = await pool.execute("UPDATE users SET age = $1 WHERE name = $2", [31, "Alice"])
-
-# DELETE
-affected = await pool.execute("DELETE FROM users WHERE age < $1", [18])</code></pre>
+                                    <h5>Example</h5>
+                                    <pre><code class="language-python">affected = await pool.execute("UPDATE users SET age = $1 WHERE name = $2", [31, "Alice"])</code></pre>
                                 </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await pool.query(query, params=None)</code>
-                                </div>
-                                <p class="method-description">Execute SELECT queries and return all matching rows.</p>
-                                <div class="method-params">
-                                    <h5>Parameters:</h5>
-                                    <ul>
-                                        <li><code>query</code> (str): SQL SELECT statement</li>
-                                        <li><code>params</code> (list, optional): Query parameters</li>
-                                    </ul>
-                                </div>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p>List of <code>Row</code> objects</p>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await pool.query(query, params=None)</code></div>
+                                <p class="method-description">Run a SELECT and return all matching rows as a list of <code>Row</code>.</p>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">rows = await pool.query("SELECT id, name, age FROM users WHERE age > $1", [25])
-for row in rows:
-    print(f"ID: {row['id']}, Name: {row['name']}, Age: {row['age']}")</code></pre>
+                                    <h5>Example</h5>
+                                    <pre><code class="language-python">rows = await pool.query("SELECT id, name FROM users WHERE age > $1", [25])</code></pre>
                                 </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await pool.query_one(query, params=None)</code>
-                                </div>
-                                <p class="method-description">Execute a SELECT and return its first row.</p>
-                                <div class="method-params">
-                                    <h5>Parameters:</h5>
-                                    <ul>
-                                        <li><code>query</code> (str): SQL SELECT statement</li>
-                                        <li><code>params</code> (list, optional): Query parameters</li>
-                                    </ul>
-                                </div>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p>Single <code>Row</code> object</p>
-                                </div>
-                                <div class="method-raises">
-                                    <h5>Raises:</h5>
-                                    <p>
-                                        <code>ProgrammingError</code> if zero rows are returned. If more than one
-                                        row matches, the extras are silently discarded rather than raising - only
-                                        use this when your query itself guarantees at most one row (a primary-key
-                                        lookup, <code>LIMIT 1</code>, etc.).
-                                    </p>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await pool.query_one(query, params=None)</code></div>
+                                <p class="method-description">Run a SELECT and return its first row.</p>
+                                <div class="method-raises"><h5>Raises</h5><p><code>ProgrammingError</code> on zero rows. Extra matches beyond the first are silently discarded — only use this when the query itself guarantees at most one row.</p></div>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">user = await pool.query_one("SELECT * FROM users WHERE id = $1", [1])
-print(f"User name: {user['name']}")</code></pre>
+                                    <h5>Example</h5>
+                                    <pre><code class="language-python">user = await pool.query_one("SELECT * FROM users WHERE id = $1", [1])</code></pre>
                                 </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await pool.transaction()</code>
-                                </div>
-                                <p class="method-description">
-                                    Start a new transaction (a real <code>BEGIN</code>). Await it, then use the
-                                    result as an <code>async with</code> block -
-                                    <code>async with pool.transaction():</code> raises <code>TypeError</code>
-                                    because the un-awaited coroutine has no <code>__aenter__</code>.
-                                </p>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p><code>Transaction</code> object (async context manager)</p>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await pool.transaction()</code></div>
+                                <p class="method-description">Start a transaction (a real <code>BEGIN</code>). Await it, then use the result as <code>async with</code> — <code>async with pool.transaction():</code> raises <code>TypeError</code> since the un-awaited coroutine has no <code>__aenter__</code>.</p>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
+                                    <h5>Example</h5>
                                     <pre><code class="language-python">tx = await pool.transaction()
 async with tx:
-    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    await tx.execute("UPDATE accounts SET balance = balance - 100 WHERE user_id = $1", [1])
-    # Automatically commits on success, rolls back on exception</code></pre>
+    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])</code></pre>
                                 </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await pool.close()</code>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await pool.close()</code></div>
                                 <p class="method-description">Close the pool and free its connections.</p>
-                                <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">await pool.close()</code></pre>
-                                </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">pool.is_closed()</code>
-                                </div>
-                                <p class="method-description">Check whether the pool has been closed. Synchronous - no <code>await</code>.</p>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p><code>bool</code></p>
-                                </div>
-                                <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">if not pool.is_closed():
-    await pool.query("SELECT 1")</code></pre>
-                                </div>
+                                <div class="method-signature"><code class="method-name">pool.is_closed()</code></div>
+                                <p class="method-description">Synchronous — no <code>await</code>. Returns <code>bool</code>.</p>
                             </div>
                         </div>
 
                         <div class="api-section" id="api-row">
-                            <h3 class="api-section-title">Row Class</h3>
-                            <p class="section-description">Represents a single row from a query result with dict-like interface.</p>
-                            
+                            <h3 class="api-section-title">Row class</h3>
+                            <p class="section-description" style="margin-bottom: var(--space-md);">A single query result row with a dict-like interface.</p>
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">row[key]</code>
-                                </div>
-                                <p class="method-description">Access column values by index or name. Negative indices (<code>row[-1]</code>) work like a Python list.</p>
+                                <div class="method-signature"><code class="method-name">row[key]</code></div>
+                                <p class="method-description">Access by column name or index. Negative indices work like a Python list.</p>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
+                                    <h5>Example</h5>
                                     <pre><code class="language-python">row = await pool.query_one("SELECT id, name, email FROM users WHERE id = $1", [1])
-
-# Access by column name
 print(row['name'])
-print(row['email'])
-
-# Access by index
 print(row[0])   # id
-print(row[1])   # name
 print(row[-1])  # last column</code></pre>
                                 </div>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">row.to_dict()</code>
-                                </div>
-                                <p class="method-description">Convert row to a Python dictionary.</p>
-                                <div class="method-returns">
-                                    <h5>Returns:</h5>
-                                    <p>Dictionary with column names as keys</p>
-                                </div>
+                                <div class="method-signature"><code class="method-name">row.to_dict() / .keys() / .values() / .items()</code></div>
+                                <p class="method-description"><code>keys()</code>/<code>values()</code>/<code>items()</code> return plain <code>list</code>s, not dict views. <code>to_dict()</code> gives a real <code>dict</code> for pandas/<code>json.dumps</code>.</p>
                                 <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">user_dict = row.to_dict()
-print(user_dict)  # {'id': 1, 'name': 'Alice', 'email': 'alice@example.com'}</code></pre>
+                                    <h5>Example</h5>
+                                    <pre><code class="language-python">user_dict = row.to_dict()  # {'id': 1, 'name': 'Alice', ...}</code></pre>
                                 </div>
                             </div>
                         </div>
 
                         <div class="api-section" id="api-transaction">
-                            <h3 class="api-section-title">Transaction Class</h3>
-                            <p class="section-description">
-                                Obtained via <code>await pool.transaction()</code>. Using a transaction after
-                                it has been committed or rolled back raises <code>ProgrammingError</code>
-                                rather than hanging or panicking.
-                            </p>
-
+                            <h3 class="api-section-title">Transaction class</h3>
+                            <p class="section-description" style="margin-bottom: var(--space-md);">Obtained via <code>await pool.transaction()</code>. Using it after commit/rollback raises <code>ProgrammingError</code> rather than hanging.</p>
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await tx.execute(query, params=None)</code>
-                                </div>
-                                <p class="method-description">Execute a statement within the transaction.</p>
-                                <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">tx = await pool.transaction()
-async with tx:
-    await tx.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"])
-    await tx.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [100, 1])</code></pre>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await tx.execute(...) / await tx.query(...) / await tx.query_one(...)</code></div>
+                                <p class="method-description">Same semantics as the <code>Pool</code> methods, scoped to the transaction.</p>
                             </div>
-
                             <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await tx.query(query, params=None) / await tx.query_one(query, params=None)</code>
-                                </div>
-                                <p class="method-description">Execute a query within the transaction. Same semantics as <code>pool.query</code>/<code>pool.query_one</code>.</p>
-                                <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">tx = await pool.transaction()
-async with tx:
-    users = await tx.query("SELECT * FROM users WHERE created_today = true")
-    for user in users:
-        await tx.execute("UPDATE users SET welcomed = true WHERE id = $1", [user['id']])</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="api-method">
-                                <div class="method-signature">
-                                    <code class="method-name">await tx.commit() / await tx.rollback() / tx.is_active()</code>
-                                </div>
-                                <p class="method-description">
-                                    Explicit commit/rollback - also work outside a <code>with</code> block.
-                                    <code>is_active()</code> is synchronous and returns <code>False</code> after
-                                    commit/rollback.
-                                </p>
-                                <div class="method-example">
-                                    <h5>Example:</h5>
-                                    <pre><code class="language-python">tx = await pool.transaction()
-try:
-    await tx.execute("INSERT INTO orders (user_id) VALUES ($1)", [1])
-    await tx.commit()
-except Exception:
-    await tx.rollback()
-print(tx.is_active())  # False</code></pre>
-                                </div>
+                                <div class="method-signature"><code class="method-name">await tx.commit() / await tx.rollback() / tx.is_active()</code></div>
+                                <p class="method-description">Explicit commit/rollback — also work outside a <code>with</code> block. <code>is_active()</code> is synchronous, <code>False</code> after commit/rollback.</p>
                             </div>
                         </div>
 
                         <div class="api-section" id="api-errors">
-                            <h3 class="api-section-title">Error Handling</h3>
-                            <p class="section-description">PostPyro maps <code>sqlx</code>/Postgres errors onto a DB-API 2.0-flavored exception hierarchy, so you can catch by class instead of parsing SQLSTATE codes yourself.</p>
-                            
-                            <div class="error-hierarchy">
-                                <h4>Exception Hierarchy</h4>
-                                <pre><code class="language-python">DatabaseError                    # Base database error
-├── InterfaceError              # Driver interface problems
-├── DataError                   # Data processing errors
-├── OperationalError            # Database operation errors
-├── IntegrityError              # Constraint violations
-├── InternalError               # Internal database errors
-├── ProgrammingError            # SQL programming errors
-└── NotSupportedError           # Unsupported operations</code></pre>
-                            </div>
-
+                            <h3 class="api-section-title">Error handling</h3>
+                            <p class="section-description" style="margin-bottom: var(--space-md);">Postgres/<code>sqlx</code> errors map onto a DB-API 2.0-flavored hierarchy, so you catch by class instead of parsing SQLSTATE yourself.</p>
+                            <div class="error-tree"><span class="exc-name">DatabaseError</span>                    <span class="exc-comment"># base</span>
+├── <span class="exc-name">InterfaceError</span>              <span class="exc-comment"># driver interface problems</span>
+├── <span class="exc-name">DataError</span>                   <span class="exc-comment"># bad/unrepresentable data</span>
+├── <span class="exc-name">OperationalError</span>            <span class="exc-comment"># connection / resource issues</span>
+├── <span class="exc-name">IntegrityError</span>               <span class="exc-comment"># constraint violations</span>
+├── <span class="exc-name">InternalError</span>                <span class="exc-comment"># internal database errors</span>
+├── <span class="exc-name">ProgrammingError</span>            <span class="exc-comment"># SQL / usage errors</span>
+└── <span class="exc-name">NotSupportedError</span>           <span class="exc-comment"># unsupported feature/type</span></div>
                             <div class="method-example">
-                                <h5>Error Handling Example:</h5>
-                                <pre><code class="language-python">import PostPyro
-
-async def main():
-    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
-    try:
-        await pool.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
-
-    except PostPyro.IntegrityError as e:
-        print(f"Constraint violation: {e}")
-
-    except PostPyro.OperationalError as e:
-        print(f"Database operation failed: {e}")
-
-    except PostPyro.ProgrammingError as e:
-        print(f"SQL syntax error: {e}")
-
-    except PostPyro.DatabaseError as e:
-        print(f"General database error: {e}")</code></pre>
+                                <h5>Example</h5>
+                                <pre><code class="language-python">try:
+    await pool.execute("INSERT INTO users (email) VALUES ($1)", ["invalid-email"])
+except PostPyro.IntegrityError as e:
+    print(f"Constraint violation: {e}")
+except PostPyro.DatabaseError as e:
+    print(f"Database error: {e}")</code></pre>
                             </div>
                         </div>
 
                         <div class="api-section" id="api-types">
-                            <h3 class="api-section-title">Type System</h3>
-                            <p class="section-description">PostPyro automatically converts between Python and PostgreSQL types.</p>
-                            
-                            <div class="type-table">
+                            <h3 class="api-section-title">Type system</h3>
+                            <p class="section-description" style="margin-bottom: var(--space-md);">PostPyro converts between Python and PostgreSQL types automatically in both directions.</p>
+                            <div class="type-table-wrap">
                                 <table>
-                                    <thead>
-                                        <tr>
-                                            <th>PostgreSQL Type</th>
-                                            <th>Python Type</th>
-                                            <th>Example</th>
-                                        </tr>
-                                    </thead>
+                                    <thead><tr><th>PostgreSQL type</th><th>Python type</th><th>Example</th></tr></thead>
                                     <tbody>
-                                        <tr>
-                                            <td><code>BOOLEAN</code></td>
-                                            <td><code>bool</code></td>
-                                            <td><code>True</code>, <code>False</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>SMALLINT</code>, <code>INTEGER</code>, <code>BIGINT</code></td>
-                                            <td><code>int</code></td>
-                                            <td><code>42</code>, <code>-123</code>, <code>9223372036854775807</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>REAL</code>, <code>DOUBLE PRECISION</code></td>
-                                            <td><code>float</code></td>
-                                            <td><code>3.14</code>, <code>2.718</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>NUMERIC</code></td>
-                                            <td><code>decimal.Decimal</code></td>
-                                            <td><code>Decimal('1234.5678')</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>TEXT</code>, <code>VARCHAR</code>, <code>CHAR</code>, <code>NAME</code></td>
-                                            <td><code>str</code></td>
-                                            <td><code>"Hello World"</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>DATE</code></td>
-                                            <td><code>datetime.date</code></td>
-                                            <td><code>date(2023, 12, 25)</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>TIME</code></td>
-                                            <td><code>datetime.time</code></td>
-                                            <td><code>time(14, 30, 0)</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>TIMESTAMP</code></td>
-                                            <td><code>datetime.datetime</code></td>
-                                            <td><code>datetime(2023, 12, 25, 14, 30)</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>TIMESTAMPTZ</code></td>
-                                            <td><code>datetime.datetime</code></td>
-                                            <td>With timezone info (UTC)</td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>UUID</code></td>
-                                            <td><code>str</code></td>
-                                            <td><code>'550e8400-e29b-...'</code></td>
-                                        </tr>
-                                        <tr>
-                                            <td><code>JSON</code>, <code>JSONB</code></td>
-                                            <td><code>dict</code>, <code>list</code>, etc.</td>
-                                            <td><code>{"key": "value"}</code>, <code>[1, 2, 3]</code></td>
-                                        </tr>
+                                        <tr><td><code>BOOLEAN</code></td><td><code>bool</code></td><td><code>True</code>, <code>False</code></td></tr>
+                                        <tr><td><code>SMALLINT</code>, <code>INTEGER</code>, <code>BIGINT</code></td><td><code>int</code></td><td><code>42</code>, <code>-123</code></td></tr>
+                                        <tr><td><code>REAL</code>, <code>DOUBLE PRECISION</code></td><td><code>float</code></td><td><code>3.14</code></td></tr>
+                                        <tr><td><code>NUMERIC</code></td><td><code>decimal.Decimal</code></td><td><code>Decimal('1234.5678')</code></td></tr>
+                                        <tr><td><code>TEXT</code>, <code>VARCHAR</code>, <code>CHAR</code>, <code>NAME</code></td><td><code>str</code></td><td><code>"Hello"</code></td></tr>
+                                        <tr><td><code>DATE</code></td><td><code>datetime.date</code></td><td><code>date(2023, 12, 25)</code></td></tr>
+                                        <tr><td><code>TIME</code></td><td><code>datetime.time</code></td><td><code>time(14, 30, 0)</code></td></tr>
+                                        <tr><td><code>TIMESTAMP</code></td><td><code>datetime.datetime</code> (naive)</td><td><code>datetime(2023, 12, 25, 14, 30)</code></td></tr>
+                                        <tr><td><code>TIMESTAMPTZ</code></td><td><code>datetime.datetime</code> (aware)</td><td>With tzinfo, normalized to UTC</td></tr>
+                                        <tr><td><code>UUID</code></td><td><code>uuid.UUID</code> in / <code>str</code> out</td><td><code>uuid.uuid4()</code></td></tr>
+                                        <tr><td><code>JSON</code>, <code>JSONB</code></td><td><code>dict</code>, non-homogeneous <code>list</code>/<code>tuple</code></td><td><code>{"key": "value"}</code></td></tr>
+                                        <tr><td><code>BYTEA</code></td><td><code>bytes</code> (<code>bytearray</code>/<code>memoryview</code> in)</td><td><code>b"\x00\x01"</code></td></tr>
+                                        <tr><td><code>BOOL[]</code>, <code>INT2/4/8[]</code>, <code>FLOAT4/8[]</code>, <code>TEXT[]</code>-family</td><td>homogeneous <code>list</code>/<code>tuple</code></td><td><code>[1, 2, 3]</code>, <code>["a", "b"]</code></td></tr>
                                     </tbody>
                                 </table>
                             </div>
-                            <p class="section-description">
-                                Any other type (<code>BYTEA</code>, arrays, <code>INET</code>/<code>CIDR</code>,
-                                custom/enum types, etc.) isn't decodable yet - reading such a column raises
-                                <code>PostPyro.NotSupportedError</code> naming the type, rather than silently
-                                returning the wrong value or <code>None</code>.
-                            </p>
+                            <p class="section-description">Anything else (<code>INET</code>/<code>CIDR</code>, custom/enum types, nested arrays) isn't decodable yet — reading such a column raises <code>PostPyro.NotSupportedError</code> naming the type, rather than silently returning the wrong value.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Examples Section -->
-        <section class="examples" id="examples">
+        <!-- Examples -->
+        <section id="examples">
             <div class="container">
-                <h2 class="section-title">Examples</h2>
+                <div class="section-header">
+                    <h2 class="section-title">Examples</h2>
+                </div>
                 <div class="examples-grid">
                     <div class="example-card">
-                        <h3 class="example-title">🐼 Pandas Integration</h3>
-                        <div class="example-code">
-                            <pre><code class="language-python">import asyncio
-import pandas as pd
-import PostPyro
-
-async def main():
-    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
-
-    # Query to DataFrame
-    rows = await pool.query("SELECT * FROM sales_data")
-    df = pd.DataFrame([row.to_dict() for row in rows])
-
-    print(df.head())
-    await pool.close()
-
-asyncio.run(main())</code></pre>
-                        </div>
+                        <h3 class="example-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                            Pandas integration
+                        </h3>
+                        <pre><code class="language-python">rows = await pool.query("SELECT * FROM sales_data")
+df = pd.DataFrame([row.to_dict() for row in rows])
+print(df.head())</code></pre>
                     </div>
-
                     <div class="example-card">
-                        <h3 class="example-title">🚀 FastAPI Integration</h3>
-                        <div class="example-code">
-                            <pre><code class="language-python">from fastapi import FastAPI, HTTPException
-import PostPyro
-
-app = FastAPI()
-
-@app.on_event("startup")
+                        <h3 class="example-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+                            FastAPI integration
+                        </h3>
+                        <pre><code class="language-python">@app.on_event("startup")
 async def startup():
-    app.state.pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
+    app.state.pool = await PostPyro.connect(DSN)
 
 @app.get("/users/{user_id}")
 async def get_user(user_id: int):
     try:
         user = await app.state.pool.query_one(
-            "SELECT id, name, email FROM users WHERE id = $1",
-            [user_id]
+            "SELECT id, name, email FROM users WHERE id = $1", [user_id]
         )
         return user.to_dict()
     except PostPyro.DatabaseError:
-        raise HTTPException(status_code=404, detail="User not found")</code></pre>
-                        </div>
+        raise HTTPException(404, "User not found")</code></pre>
                     </div>
-
                     <div class="example-card">
-                        <h3 class="example-title">🔧 Pooling Is Built In</h3>
-                        <div class="example-code">
-                            <pre><code class="language-python">import asyncio
-import PostPyro
+                        <h3 class="example-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            Pooling is built in
+                        </h3>
+                        <pre><code class="language-python">pool = await PostPyro.connect(DSN, max_size=20, min_size=2)
 
-async def main():
-    # Pool is already a connection pool - no wrapper class needed.
-    # max_size/min_size configure how many connections it keeps.
-    pool = await PostPyro.connect(
-        "postgresql://user:pass@localhost/db",
-        max_size=20,
-        min_size=2,
-    )
-
-    # Concurrent queries share the pool automatically
-    results = await asyncio.gather(
-        pool.query("SELECT * FROM users WHERE id = $1", [1]),
-        pool.query("SELECT * FROM users WHERE id = $1", [2]),
-    )
-
-    if not pool.is_closed():
-        await pool.close()
-
-asyncio.run(main())</code></pre>
-                        </div>
+results = await asyncio.gather(
+    pool.query("SELECT * FROM users WHERE id = $1", [1]),
+    pool.query("SELECT * FROM users WHERE id = $1", [2]),
+)</code></pre>
                     </div>
-
                     <div class="example-card">
-                        <h3 class="example-title">💾 Batch Processing</h3>
-                        <div class="example-code">
-                            <pre><code class="language-python">async def bulk_insert_users(pool, users_data):
-    # Single transaction - all rows commit or roll back together
-    tx = await pool.transaction()
-    async with tx:
-        for user_data in users_data:
-            await tx.execute(
-                "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
-                [user_data['name'], user_data['email'], user_data['age']]
-            )
-
-    # There's no execute_batch() - looping awaited execute() calls
-    # is the working pattern (still parameterized, no string formatting)
-    for user_data in users_data:
-        await pool.execute(
+                        <h3 class="example-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><rect x="3" y="8" width="18" height="13" rx="2"/><line x1="7" y1="13" x2="17" y2="13"/></svg>
+                            Batch processing
+                        </h3>
+                        <pre><code class="language-python">tx = await pool.transaction()
+async with tx:
+    for row in users_data:
+        await tx.execute(
             "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
-            [user_data['name'], user_data['email'], user_data['age']]
-        )</code></pre>
-                        </div>
+            [row['name'], row['email'], row['age']]
+        )
+    # All rows commit or roll back together</code></pre>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Performance Section -->
-        <section class="performance" id="performance">
+        <!-- Performance -->
+        <section id="performance">
             <div class="container">
-                <h2 class="section-title">Performance</h2>
-                <div class="performance-content">
-                    <div class="performance-intro">
-                        <h3>Why PostPyro is Faster</h3>
-                        <div class="performance-reasons">
-                            <div class="reason">
-                                <div class="reason-icon">🦀</div>
-                                <div class="reason-content">
-                                    <h4>Rust Backend</h4>
-                                    <p>Native performance without Python interpreter overhead</p>
-                                </div>
-                            </div>
-                            <div class="reason">
-                                <div class="reason-icon">⚡</div>
-                                <div class="reason-content">
-                                    <h4>Zero-Copy Operations</h4>
-                                    <p>Direct memory mapping between PostgreSQL and Python</p>
-                                </div>
-                            </div>
-                            <div class="reason">
-                                <div class="reason-icon">🌊</div>
-                                <div class="reason-content">
-                                    <h4>Async I/O</h4>
-                                    <p>sqlx + Tokio-powered async networking, releasing the GIL while waiting on Postgres</p>
-                                </div>
-                            </div>
-                            <div class="reason">
-                                <div class="reason-icon">📦</div>
-                                <div class="reason-content">
-                                    <h4>No Dependencies</h4>
-                                    <p>No external Python dependencies</p>
-                                </div>
-                            </div>
-                        </div>
+                <div class="section-header">
+                    <h2 class="section-title">Performance</h2>
+                </div>
+
+                <div class="performance-reasons">
+                    <div class="reason">
+                        <div class="reason-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+                        <h4>Rust backend</h4>
+                        <p>Native performance without Python interpreter overhead.</p>
                     </div>
-
-                    <div class="performance-comparison">
-                        <h3>Driver Comparison</h3>
-                        <div class="comparison-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Feature</th>
-                                        <th>PostPyro</th>
-                                        <th>psycopg2</th>
-                                        <th>asyncpg</th>
-                                        <th>psycopg3</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>Language</td>
-                                        <td><span class="badge rust">Rust + Python</span></td>
-                                        <td><span class="badge c">C + Python</span></td>
-                                        <td><span class="badge cython">Cython</span></td>
-                                        <td><span class="badge c">C + Python</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Performance</td>
-                                        <td><span class="stars">⭐⭐⭐⭐⭐</span></td>
-                                        <td><span class="stars">⭐⭐⭐</span></td>
-                                        <td><span class="stars">⭐⭐⭐⭐</span></td>
-                                        <td><span class="stars">⭐⭐⭐</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Memory Safety</td>
-                                        <td><span class="badge success">✅ Rust</span></td>
-                                        <td><span class="badge danger">❌ Manual C</span></td>
-                                        <td><span class="badge warning">⚠️ Cython</span></td>
-                                        <td><span class="badge danger">❌ Manual C</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Installation</td>
-                                        <td><span class="badge success">📦 Wheel</span></td>
-                                        <td><span class="badge warning">🔧 Compilation</span></td>
-                                        <td><span class="badge success">📦 Wheel</span></td>
-                                        <td><span class="badge warning">🔧 Compilation</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Dependencies</td>
-                                        <td><span class="badge success">🎯 Zero</span></td>
-                                        <td><span class="badge danger">📦 Many</span></td>
-                                        <td><span class="badge warning">📦 Few</span></td>
-                                        <td><span class="badge danger">📦 Many</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Async</td>
-                                        <td><span class="badge success">✅ Fully Async</span></td>
-                                        <td><span class="badge danger">❌ Sync</span></td>
-                                        <td><span class="badge success">✅ Fully Async</span></td>
-                                        <td><span class="badge warning">⚠️ Sync or Async</span></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="reason">
+                        <div class="reason-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg></div>
+                        <h4>Async I/O</h4>
+                        <p><code>sqlx</code> + Tokio-powered networking, GIL released while waiting on Postgres.</p>
                     </div>
-
-                    <div class="performance-benchmark">
-                        <h3>Performance Benchmark</h3>
-                        <div class="benchmark-code">
-                            <pre><code class="language-python">import asyncio
-import time
-import PostPyro
-
-async def main():
-    pool = await PostPyro.connect("postgresql://user:pass@localhost/db")
-
-    # Benchmark: Insert 10,000 records concurrently across the pool
-    start_time = time.time()
-
-    await asyncio.gather(*(
-        pool.execute("INSERT INTO benchmark (value) VALUES ($1)", [i])
-        for i in range(10000)
-    ))
-
-    elapsed = time.time() - start_time
-    print(f"Inserted 10,000 records in {elapsed:.2f} seconds")
-    print(f"Rate: {10000/elapsed:.0f} inserts/second")
-
-    await pool.close()
-
-asyncio.run(main())</code></pre>
-                        </div>
+                    <div class="reason">
+                        <div class="reason-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0 1 14.13-5.36M20 15a9 9 0 0 1-14.13 5.36"/></svg></div>
+                        <h4>Binary protocol</h4>
+                        <p>Direct wire-format encode/decode instead of text parsing round trips.</p>
+                    </div>
+                    <div class="reason">
+                        <div class="reason-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+                        <h4>Zero dependencies</h4>
+                        <p>No external Python packages required at runtime.</p>
                     </div>
                 </div>
+
+                <h3 class="section-title" style="font-size: 1.25rem; margin-bottom: var(--space-lg);">Driver comparison</h3>
+                <div class="comparison-wrap">
+                    <table>
+                        <thead><tr><th>Feature</th><th>PostPyro</th><th>psycopg2</th><th>asyncpg</th><th>psycopg3</th></tr></thead>
+                        <tbody>
+                            <tr><td>Language</td><td>Rust + Python</td><td>C + Python</td><td>Cython</td><td>C + Python</td></tr>
+                            <tr><td>Memory safety</td><td><span class="pill check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Rust</span></td><td><span class="pill cross"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Manual C</span></td><td><span class="pill dash">— Cython</span></td><td><span class="pill cross"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Manual C</span></td></tr>
+                            <tr><td>Installation</td><td>Wheel</td><td>Compilation</td><td>Wheel</td><td>Compilation</td></tr>
+                            <tr><td>Dependencies</td><td>Zero</td><td>Several</td><td>Few</td><td>Several</td></tr>
+                            <tr><td>Async</td><td><span class="pill check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Fully async</span></td><td><span class="pill cross"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Sync</span></td><td><span class="pill check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Fully async</span></td><td><span class="pill dash">— Sync or async</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <pre><code class="language-python"># Insert 10,000 records concurrently across the pool
+start = time.time()
+await asyncio.gather(*(
+    pool.execute("INSERT INTO benchmark (value) VALUES ($1)", [i])
+    for i in range(10000)
+))
+elapsed = time.time() - start
+print(f"Inserted 10,000 records in {elapsed:.2f}s ({10000/elapsed:.0f}/s)")</code></pre>
             </div>
         </section>
     </main>
 
-    <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h3 class="footer-title">PostPyro</h3>
-                    <p class="footer-description">
-                        Async PostgreSQL driver for Python, built with Rust, PyO3, and sqlx.
-                    </p>
-                    <div class="footer-links">
-                        <a href="https://github.com/magi8101/PostPyro" target="_blank" class="footer-link">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                            </svg>
-                            GitHub
-                        </a>
-                        <a href="https://pypi.org/project/PostPyro/" target="_blank" class="footer-link">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                            </svg>
-                            PyPI
-                        </a>
+            <div class="footer-grid">
+                <div>
+                    <div class="footer-brand">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 1 0 3 2 3 6a8 8 0 0 1-16 0c0-5 4-7 5-10 0 2 1 3 3 0z"/></svg>
+                        <strong>PostPyro</strong>
                     </div>
+                    <p class="footer-description">Async PostgreSQL driver for Python, built with Rust, PyO3, and sqlx.</p>
                 </div>
-                <div class="footer-section">
-                    <h4 class="footer-section-title">Documentation</h4>
+                <div>
+                    <p class="footer-heading">Documentation</p>
                     <ul class="footer-menu">
-                        <li><a href="#quickstart" class="footer-menu-link">Quick Start</a></li>
-                        <li><a href="#api-reference" class="footer-menu-link">API Reference</a></li>
+                        <li><a href="#quickstart" class="footer-menu-link">Quick start</a></li>
+                        <li><a href="#api-reference" class="footer-menu-link">API reference</a></li>
                         <li><a href="#examples" class="footer-menu-link">Examples</a></li>
                         <li><a href="#performance" class="footer-menu-link">Performance</a></li>
                     </ul>
                 </div>
-                <div class="footer-section">
-                    <h4 class="footer-section-title">Resources</h4>
+                <div>
+                    <p class="footer-heading">Resources</p>
                     <ul class="footer-menu">
-                        <li><a href="https://github.com/magi8101/PostPyro/issues" target="_blank" class="footer-menu-link">Report Issues</a></li>
-                        <li><a href="https://github.com/magi8101/PostPyro/discussions" target="_blank" class="footer-menu-link">Discussions</a></li>
-                        <li><a href="https://github.com/magi8101/PostPyro/blob/main/CHANGELOG.md" target="_blank" class="footer-menu-link">Changelog</a></li>
+                        <li><a href="https://github.com/magi8101/PostPyro/issues" target="_blank" rel="noopener" class="footer-menu-link">Report an issue</a></li>
+                        <li><a href="https://github.com/magi8101/PostPyro/discussions" target="_blank" rel="noopener" class="footer-menu-link">Discussions</a></li>
+                        <li><a href="https://github.com/magi8101/PostPyro/blob/master/CHANGELOG.md" target="_blank" rel="noopener" class="footer-menu-link">Changelog</a></li>
                     </ul>
                 </div>
-                <div class="footer-section">
-                    <h4 class="footer-section-title">Built With</h4>
+                <div>
+                    <p class="footer-heading">Built with</p>
                     <ul class="footer-menu">
-                        <li><span class="footer-tech">🦀 Rust</span></li>
-                        <li><span class="footer-tech">🐍 PyO3</span></li>
-                        <li><span class="footer-tech">🌊 sqlx</span></li>
-                        <li><span class="footer-tech">⚡ Maturin</span></li>
+                        <li>Rust</li>
+                        <li>PyO3 / pyo3-asyncio</li>
+                        <li>sqlx</li>
+                        <li>Maturin</li>
                     </ul>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p class="footer-copyright">
-                    © 2024 PostPyro. Built with ❤️ using Rust, PyO3, and sqlx.
-                </p>
-                <p class="footer-version">
-                    Version 2.0.0-dev | MIT License
-                </p>
+                <span>MIT License</span>
+                <span>v2.0.0-dev — Beta</span>
             </div>
         </div>
     </footer>
+
+    <button class="scroll-top" id="scroll-top" aria-label="Scroll to top">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+    </button>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
