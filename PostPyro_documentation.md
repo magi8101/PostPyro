@@ -8,7 +8,7 @@ PostPyro is an async PostgreSQL driver for Python built with PyO3/`pyo3-asyncio`
 
 This is the full reference - every method, type, and exception. If you just want a query running, [`README.md`](README.md) has a shorter quick start.
 
-PostPyro runs `sqlx`'s binary protocol under PyO3, so every `await` releases the GIL for the duration of the wait instead of blocking the interpreter. Rust's ownership system rules out the memory-safety bugs (leaks, segfaults) that hand-rolled C bindings are prone to. TLS is available through `sqlx`'s `rustls` backend, and errors surface through a DB-API 2.0-flavored exception hierarchy rather than raw `sqlx` errors. The type system covers booleans, integers, floats, `NUMERIC`, text, dates/times, UUIDs, and JSON/JSONB automatically - see the [type table](#supported-type-conversions) for exactly what's decodable today (arrays and network types aren't yet).
+PostPyro runs `sqlx`'s binary protocol under PyO3, so every `await` releases the GIL for the duration of the wait instead of blocking the interpreter. Rust's ownership system rules out the memory-safety bugs (leaks, segfaults) that hand-rolled C bindings are prone to. TLS is available through `sqlx`'s `rustls` backend, and errors surface through a DB-API 2.0-flavored exception hierarchy rather than raw `sqlx` errors. The type system covers booleans, integers, floats, `NUMERIC`, text, dates/times, UUIDs, JSON/JSONB, `BYTEA`, and bool/int/float/text arrays automatically - see the [type table](#supported-type-conversions) for exactly what's decodable today (network types and custom/enum types aren't yet).
 
 ## Installation
 
