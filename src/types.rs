@@ -164,17 +164,17 @@ impl<'q> sqlx::Encode<'q, Postgres> for UnspecifiedNull {
     }
 }
 
-/// Read an int attribute off a Python object (e.g. `dt.year`, which chrono
-/// takes as `i32` since it can be negative/large).
-fn get_int_attr(obj: &PyAny, attr: &str) -> PyResult<i32> {
-    obj.getattr(attr)?.extract::<i32>()
-}
-
-/// Read an int attribute chrono takes as `u32` (month/day/hour/minute/
-/// second/microsecond - all non-negative by construction on a real
-/// `date`/`time`/`datetime` instance).
-fn get_uint_attr(obj: &PyAny, attr: &str) -> PyResult<u32> {
-    obj.getattr(attr)?.extract::<u32>()
+/// Read an int attribute off a Python object (e.g. `dt.year`, `d.month`) as
+/// whatever integer type the caller needs. Generic over `T` rather than one
+/// hand-written function per width - chrono's constructors take `i32` for
+/// year (can be negative/large) but `u32` for month/day/hour/minute/second/
+/// microsecond, and a per-width copy is exactly the kind of duplication that
+/// lets a wrong-width call site go unnoticed (as happened here: an earlier
+/// version of this function only had an `i32` variant, silently passing
+/// `i32` everywhere chrono actually wanted `u32`, which type inference on a
+/// generic function catches at the call site instead).
+fn get_attr<'py, T: pyo3::FromPyObject<'py>>(obj: &'py PyAny, attr: &str) -> PyResult<T> {
+    obj.getattr(attr)?.extract::<T>()
 }
 
 /// Which Postgres temporal type a Python `datetime.datetime` binds as:
@@ -199,16 +199,16 @@ enum PyDateTimeParam {
 fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
     let naive = NaiveDateTime::new(
         NaiveDate::from_ymd_opt(
-            get_int_attr(obj, "year")?,
-            get_uint_attr(obj, "month")?,
-            get_uint_attr(obj, "day")?,
+            get_attr::<i32>(obj, "year")?,
+            get_attr::<u32>(obj, "month")?,
+            get_attr::<u32>(obj, "day")?,
         )
         .ok_or_else(|| DataError::new_err("invalid date component in datetime parameter"))?,
         NaiveTime::from_hms_micro_opt(
-            get_uint_attr(obj, "hour")?,
-            get_uint_attr(obj, "minute")?,
-            get_uint_attr(obj, "second")?,
-            get_uint_attr(obj, "microsecond")?,
+            get_attr::<u32>(obj, "hour")?,
+            get_attr::<u32>(obj, "minute")?,
+            get_attr::<u32>(obj, "second")?,
+            get_attr::<u32>(obj, "microsecond")?,
         )
         .ok_or_else(|| DataError::new_err("invalid time component in datetime parameter"))?,
     );
@@ -236,9 +236,9 @@ fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
 /// Python `datetime.date` -> `chrono::NaiveDate`.
 fn py_date_to_chrono(obj: &PyAny) -> PyResult<NaiveDate> {
     NaiveDate::from_ymd_opt(
-        get_int_attr(obj, "year")?,
-        get_uint_attr(obj, "month")?,
-        get_uint_attr(obj, "day")?,
+        get_attr::<i32>(obj, "year")?,
+        get_attr::<u32>(obj, "month")?,
+        get_attr::<u32>(obj, "day")?,
     )
     .ok_or_else(|| DataError::new_err("invalid date parameter"))
 }
@@ -246,10 +246,10 @@ fn py_date_to_chrono(obj: &PyAny) -> PyResult<NaiveDate> {
 /// Python `datetime.time` -> `chrono::NaiveTime`.
 fn py_time_to_chrono(obj: &PyAny) -> PyResult<NaiveTime> {
     let t = NaiveTime::from_hms_micro_opt(
-        get_uint_attr(obj, "hour")?,
-        get_uint_attr(obj, "minute")?,
-        get_uint_attr(obj, "second")?,
-        get_uint_attr(obj, "microsecond")?,
+        get_attr::<u32>(obj, "hour")?,
+        get_attr::<u32>(obj, "minute")?,
+        get_attr::<u32>(obj, "second")?,
+        get_attr::<u32>(obj, "microsecond")?,
     )
     .ok_or_else(|| DataError::new_err("invalid time parameter"))?;
     // A time with tzinfo != None binds as its naive wall-clock value; Postgres
