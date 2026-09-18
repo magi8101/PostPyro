@@ -16,11 +16,14 @@ All notable changes to PostPyro will be documented in this file.
 - Float parameters no longer lose precision to a forced `f32` downcast before binding.
 - `Row.keys()`/`values()`/`items()`/`to_dict()`/`get()`/`__iter__`/`__repr__` are implemented (previously documented but missing).
 - Binding a plain `None` into a non-text column (e.g. `INT4`, `FLOAT8`) no longer raises a Postgres type-mismatch error - it's now bound as an untyped NULL and Postgres infers the real column type, the same way `NULL` binds in other drivers.
-- Reading a column of a type the driver doesn't yet decode (e.g. `BYTEA`, arrays) now raises `NotSupportedError` naming the type, instead of silently returning `None` as if the value were a real SQL NULL.
+- Reading a column of a type the driver doesn't yet decode (e.g. `INET`, custom/enum types) now raises `NotSupportedError` naming the type, instead of silently returning `None` as if the value were a real SQL NULL.
 - `NUMERIC` columns decode to `decimal.Decimal` with full precision (previously fell into the same silent-`None` bug above).
 
 ### Added
 
+- Native parameter binding for non-primitive Python types: `datetime.datetime` (naive → `TIMESTAMP`, tz-aware → `TIMESTAMPTZ` normalized to UTC), `datetime.date` → `DATE`, `datetime.time` → `TIME`, `uuid.UUID` → `UUID`, `decimal.Decimal` → `NUMERIC` (exact, no float round-trip), `dict` → `JSON`/`JSONB`, a homogeneous `list`/`tuple` → a native Postgres array (`bool[]`/`int8[]`/`float8[]`/`text[]`, mixed/nested ones fall back to `JSON`/`JSONB`), and `bytes`/`bytearray`/`memoryview` → `BYTEA`. These no longer require `str()` plus a manual `$1::type` cast in the SQL text (a tz-aware `datetime.time` still raises `NotSupportedError`; a `set`/`frozenset` or other JSON-incompatible object raises `DataError` naming the type).
+- `BOOL[]`/`INT2[]`/`INT4[]`/`INT8[]`/`FLOAT4[]`/`FLOAT8[]`/`TEXT[]`-family columns decode to Python `list` (previously any array raised `NotSupportedError`).
+- `BYTEA` columns decode to Python `bytes` (previously raised `NotSupportedError`).
 - TLS-capable connections (via `sqlx`'s `rustls` backend) - the old driver hardcoded `NoTls`.
 
 ## [1.0.0] - 2025-10-03

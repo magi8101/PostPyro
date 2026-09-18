@@ -1,13 +1,132 @@
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString};
+use pyo3::sync::GILOnceCell;
+use pyo3::types::{
+    PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString,
+    PyTuple,
+};
 use sqlx::postgres::PgRow;
 use sqlx::postgres::types::Oid;
 use sqlx::{Column, Postgres, Row as SqlxRow, TypeInfo};
+use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::error::{map_db_error, NotSupportedError};
+use crate::error::{map_db_error, DataError, NotSupportedError};
+
+/// Python stdlib classes used to recognize bindable parameter types.
+///
+/// We can't `downcast::<PyDateTime>()` for this: pyo3 compiles its own
+/// `PyDate`/`PyTime`/`PyDateTime` wrapper API out under `abi3`
+/// (`#[cfg(not(Py_LIMITED_API))]` - same finding already documented in
+/// `naive_date_to_py` below), and there are no pyo3 wrappers at all for
+/// `uuid.UUID` or `decimal.Decimal`. So we hold the class objects themselves
+/// (fetched once, `GILOnceCell` mediating with the GIL) and check with
+/// Python-level `isinstance`, which also honors subclasses the way users
+/// expect (e.g. a `datetime` subclass instance binds as a datetime).
+static PY_DATETIME: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static PY_DATE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static PY_TIME: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static PY_UUID: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static PY_DECIMAL: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static PY_MEMORYVIEW: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+
+fn py_class<'py>(
+    py: Python<'py>,
+    cell: &'static GILOnceCell<Py<PyAny>>,
+    module: &str,
+    name: &str,
+) -> PyResult<&'py PyAny> {
+    let cls = cell.get_or_try_init(py, || -> PyResult<Py<PyAny>> {
+        Ok(py.import(module)?.getattr(name)?.into_py(py))
+    })?;
+    Ok(cls.as_ref(py))
+}
+
+fn py_isinstance(
+    py: Python,
+    obj: &PyAny,
+    cell: &'static GILOnceCell<Py<PyAny>>,
+    module: &str,
+    name: &str,
+) -> PyResult<bool> {
+    let cls = py_class(py, cell, module, name)?;
+    obj.is_instance(cls)
+}
+
+/// Maximum nesting depth accepted when converting a Python container to a
+/// JSON value. A self-referential dict (easily built by accident) would
+/// otherwise recurse until the Rust stack overflows - an abort, not a
+/// catchable Python exception. Python's own json.dumps dies on the same
+/// input via its recursion guard; this is our shallower equivalent.
+const MAX_JSON_DEPTH: usize = 128;
+
+/// Convert a Python dict/list/tuple into a `serde_json::Value` for binding
+/// against JSON/JSONB columns. Mirrors the read side (`json_to_py` below)
+/// in reverse. Python ints beyond JSON's exact range (i64/u64) raise
+/// `DataError` rather than silently degrading to a lossy float - the read
+/// side hands such numbers through as strings, but guessing on the write
+/// side would corrupt data, so it fails loudly instead.
+fn py_to_json(obj: &PyAny) -> PyResult<serde_json::Value> {
+    py_to_json_depth(obj, 0)
+}
+
+fn py_to_json_depth(obj: &PyAny, depth: usize) -> PyResult<serde_json::Value> {
+    if depth > MAX_JSON_DEPTH {
+        return Err(DataError::new_err(format!(
+            "parameter nesting exceeds {} levels - too deep to bind as JSON (self-referential container?)",
+            MAX_JSON_DEPTH
+        )));
+    }
+    if obj.is_none() {
+        Ok(serde_json::Value::Null)
+    } else if let Ok(b) = obj.downcast::<PyBool>() {
+        Ok(serde_json::Value::Bool(b.extract::<bool>()?))
+    } else if let Ok(i) = obj.downcast::<PyInt>() {
+        if let Ok(v) = i.extract::<i64>() {
+            Ok(serde_json::Value::from(v))
+        } else if let Ok(v) = i.extract::<u64>() {
+            Ok(serde_json::Value::from(v))
+        } else {
+            Err(DataError::new_err(
+                "JSON integer is outside the exact range JSON can represent (i64/u64) - bind it as a string or numeric instead",
+            ))
+        }
+    } else if let Ok(f) = obj.downcast::<PyFloat>() {
+        Ok(serde_json::Value::from(f.extract::<f64>()?))
+    } else if let Ok(s) = obj.downcast::<PyString>() {
+        Ok(serde_json::Value::from(s.extract::<String>()?))
+    } else if let Ok(l) = obj.downcast::<PyList>() {
+        let mut items = Vec::with_capacity(l.len());
+        for item in l.iter() {
+            items.push(py_to_json_depth(item, depth + 1)?);
+        }
+        Ok(serde_json::Value::Array(items))
+    } else if let Ok(t) = obj.downcast::<PyTuple>() {
+        let mut items = Vec::with_capacity(t.len());
+        for item in t.iter() {
+            items.push(py_to_json_depth(item, depth + 1)?);
+        }
+        Ok(serde_json::Value::Array(items))
+    } else if let Ok(d) = obj.downcast::<PyDict>() {
+        let mut map = serde_json::Map::new();
+        for (k, v) in d.iter() {
+            // JSON object keys are strings; non-string keys are stringified
+            // (same as json.dumps does for int keys), not an error. Note a
+            // collision ({1: "a", "1": "b"}) silently keeps the last value,
+            // exactly like json.dumps.
+            let key = k.str()?.extract::<String>()?;
+            map.insert(key, py_to_json_depth(v, depth + 1)?);
+        }
+        Ok(serde_json::Value::Object(map))
+    } else {
+        let type_name = obj.get_type().name().ok().unwrap_or("unknown");
+        Err(DataError::new_err(format!(
+            "cannot bind a {} object to a JSON/JSONB parameter - pass a dict/list/tuple/str/int/float/bool/None",
+            type_name
+        )))
+    }
+}
 
 /// A bind value for SQL `NULL` that declares its Postgres parameter type as
 /// OID 0 ("unspecified") instead of a concrete type.
@@ -45,6 +164,105 @@ impl<'q> sqlx::Encode<'q, Postgres> for UnspecifiedNull {
     }
 }
 
+/// Read an int attribute off a Python object (e.g. `dt.year`, `d.month`) as
+/// whatever integer type the caller needs. Generic over `T` rather than one
+/// hand-written function per width - chrono's constructors take `i32` for
+/// year (can be negative/large) but `u32` for month/day/hour/minute/second/
+/// microsecond, and a per-width copy is exactly the kind of duplication that
+/// lets a wrong-width call site go unnoticed (as happened here: an earlier
+/// version of this function only had an `i32` variant, silently passing
+/// `i32` everywhere chrono actually wanted `u32`, which type inference on a
+/// generic function catches at the call site instead).
+fn get_attr<'py, T: pyo3::FromPyObject<'py>>(obj: &'py PyAny, attr: &str) -> PyResult<T> {
+    obj.getattr(attr)?.extract::<T>()
+}
+
+/// Which Postgres temporal type a Python `datetime.datetime` binds as:
+/// naive wall-clock -> TIMESTAMP, timezone-aware -> TIMESTAMPTZ (instant
+/// normalized to UTC). Splitting them keeps the wire type matching the
+/// column type instead of relying on the server's implicit
+/// timestamptz->timestamp cast under the session timezone.
+enum PyDateTimeParam {
+    Timestamp(NaiveDateTime),
+    Timestamptz(DateTime<Utc>),
+}
+
+/// Python `datetime.datetime` -> the right sqlx bind parameter. Attributes
+/// are read through the plain `PyAny` API because pyo3 compiles its chrono
+/// `FromPyObject` impls out under `abi3` (same constraint as the decode
+/// side below).
+///
+/// The offset is read via `datetime.utcoffset()` on the datetime itself -
+/// NOT `tzinfo.utcoffset()`, which takes the datetime as an argument and
+/// would raise `TypeError` (and, for a DST-observing zone, has no
+/// offset-independent answer at all).
+fn py_datetime_to_param(obj: &PyAny) -> PyResult<PyDateTimeParam> {
+    let naive = NaiveDateTime::new(
+        NaiveDate::from_ymd_opt(
+            get_attr::<i32>(obj, "year")?,
+            get_attr::<u32>(obj, "month")?,
+            get_attr::<u32>(obj, "day")?,
+        )
+        .ok_or_else(|| DataError::new_err("invalid date component in datetime parameter"))?,
+        NaiveTime::from_hms_micro_opt(
+            get_attr::<u32>(obj, "hour")?,
+            get_attr::<u32>(obj, "minute")?,
+            get_attr::<u32>(obj, "second")?,
+            get_attr::<u32>(obj, "microsecond")?,
+        )
+        .ok_or_else(|| DataError::new_err("invalid time component in datetime parameter"))?,
+    );
+    // utcoffset() -> timedelta, or None when the tzinfo can't determine the
+    // offset for this instant - treat that like naive rather than guessing.
+    let offset = obj.call_method0("utcoffset")?;
+    if offset.is_none() {
+        return Ok(PyDateTimeParam::Timestamp(naive));
+    }
+    let total_seconds = offset.call_method0("total_seconds")?.extract::<f64>()?;
+    if total_seconds != total_seconds.trunc() || total_seconds.abs() > 86_399.0 {
+        return Err(DataError::new_err(format!(
+            "datetime parameter has an invalid utcoffset ({} seconds) - Postgres offsets are whole seconds within +/-24h",
+            total_seconds
+        )));
+    }
+    let fixed = chrono::FixedOffset::east_opt(total_seconds as i32)
+        .ok_or_else(|| DataError::new_err("datetime parameter utcoffset out of range"))?;
+    Ok(PyDateTimeParam::Timestamptz(DateTime::from_naive_utc_and_offset(
+        naive - fixed,
+        Utc,
+    )))
+}
+
+/// Python `datetime.date` -> `chrono::NaiveDate`.
+fn py_date_to_chrono(obj: &PyAny) -> PyResult<NaiveDate> {
+    NaiveDate::from_ymd_opt(
+        get_attr::<i32>(obj, "year")?,
+        get_attr::<u32>(obj, "month")?,
+        get_attr::<u32>(obj, "day")?,
+    )
+    .ok_or_else(|| DataError::new_err("invalid date parameter"))
+}
+
+/// Python `datetime.time` -> `chrono::NaiveTime`.
+fn py_time_to_chrono(obj: &PyAny) -> PyResult<NaiveTime> {
+    let t = NaiveTime::from_hms_micro_opt(
+        get_attr::<u32>(obj, "hour")?,
+        get_attr::<u32>(obj, "minute")?,
+        get_attr::<u32>(obj, "second")?,
+        get_attr::<u32>(obj, "microsecond")?,
+    )
+    .ok_or_else(|| DataError::new_err("invalid time parameter"))?;
+    // A time with tzinfo != None binds as its naive wall-clock value; Postgres
+    // has TIMETZ but sqlx's chrono support maps NaiveTime to TIME only, and
+    // TIMETZ is documented by Postgres itself as mostly for legacy use.
+    if !obj.getattr("tzinfo")?.is_none() {
+        return Err(NotSupportedError::new_err(
+            "bind a tz-aware datetime.time as a TIMESTAMPTZ datetime instead, or strip tzinfo - PostPyro binds times as TIME (no TIMETZ support)",
+        ));
+    }
+    Ok(t)
+}
+
 /// Bind a Python parameter list onto a query, one `.bind()` call per
 /// parameter. sqlx only exposes `.bind()` (not a standalone Arguments
 /// builder) for the default `Query<DB, DB::Arguments>` returned by
@@ -73,21 +291,60 @@ impl<'q> sqlx::Encode<'q, Postgres> for UnspecifiedNull {
 /// concurrently on the same SQL text): key the cache on (SQL text, argument
 /// type fingerprint) instead of SQL text alone.
 ///
-/// Anything that isn't `bool`/`int`/`float`/`str`/`None` falls through to
-/// `str(obj)` and binds as TEXT (see the `else` arm below) - there is no
-/// automatic conversion for `date`/`datetime`/`uuid.UUID`/`dict`/etc., unlike
-/// the read side's `pg_value_to_py`. Pass those as strings with an explicit
-/// Postgres cast in the SQL text instead (`$1::date`, `$1::uuid`,
-/// `$1::jsonb`) - see `tests/type_conversion_bugs.py` for working examples.
+/// Beyond the primitives, the types Python users actually hold bind natively
+/// (matching sqlx's own type map - see docs.rs/sqlx postgres::types):
+/// `datetime.datetime` -> TIMESTAMP/TIMESTAMPTZ, `datetime.date` -> DATE,
+/// `datetime.time` -> TIME, `uuid.UUID` -> UUID, `decimal.Decimal` ->
+/// NUMERIC, `bytes`/`bytearray`/`memoryview` -> BYTEA. A timezone-aware
+/// datetime binds as TIMESTAMPTZ (utc offset applied), a naive one as
+/// TIMESTAMP - Postgres stores both correctly without any `$1::type` cast in
+/// the SQL text.
+///
+/// A `list`/`tuple` of a single primitive type (`bool`/`int`/`float`/`str`,
+/// `None` entries allowed) binds as a real Postgres array of that type - see
+/// `py_sequence_to_array`. `dict`, and any list/tuple that isn't a
+/// homogeneous primitive sequence (mixed types, nesting), binds as
+/// JSON/JSONB via `py_to_json` instead.
+///
+/// ponytail: like the untyped-NULL and naive/aware-datetime hazards
+/// documented above, an array's element type (bool[] vs. int8[] vs. text[])
+/// isn't accounted for in the persistent-statement cache key either - the
+/// same SQL text called once with an int array and later with a string
+/// array for the same placeholder hits the identical "incorrect binary data
+/// format" failure mode. Same upgrade path: key the cache on argument type
+/// fingerprint, not SQL text alone, if this becomes a real collision.
+///
+/// Anything else still falls through to `str(obj)` and binds as TEXT (see
+/// the last arm below) - e.g. pass `INET` values as strings with an
+/// explicit `$1::inet` cast. See `tests/native_binding.py` and
+/// `tests/native_array_binding.py` for working examples of every
+/// natively-bound type.
 pub fn bind_params<'q>(
     query: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
     py: Python,
     params: &[PyObject],
 ) -> PyResult<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>> {
     let mut has_null = false;
+    // DATE, naive datetime (TIMESTAMP), and aware datetime (TIMESTAMPTZ) are
+    // three different wire sizes/formats bindable from overlapping Python
+    // types (date/datetime, and datetime again depending on tzinfo). sqlx's
+    // cache is keyed on SQL text only (see the long comment above), so a SQL
+    // text first prepared from one of these types would collide with a later
+    // call using a different one for the same placeholder - "incorrect
+    // binary data format" - even though any single call only ever sees one
+    // of the three. (An earlier version of this flag only caught two
+    // datetime kinds appearing *together in one call*, which doesn't guard
+    // the actual common case: separate calls to the same SQL text, one
+    // naive/aware/date at a time.) Same hazard shape as the NULL case below;
+    // same fix: drop persistence for every call that binds any of the three.
+    let mut has_ambiguous_temporal = false;
     let mut query = query;
     for obj in params {
         let obj_ref = obj.as_ref(py);
+        // ORDER MATTERS: datetime must be checked before date -
+        // datetime.datetime is a subclass of datetime.date, and isinstance
+        // (deliberately used here for subclass support) would otherwise bind
+        // every datetime as a bare DATE, silently dropping its time.
         if obj.is_none(py) {
             has_null = true;
             query = query.bind(UnspecifiedNull);
@@ -99,12 +356,184 @@ pub fn bind_params<'q>(
             query = query.bind(f.extract::<f64>()?)
         } else if let Ok(s) = obj_ref.downcast::<PyString>() {
             query = query.bind(s.extract::<String>()?)
+        } else if py_isinstance(py, obj_ref, &PY_DATETIME, "datetime", "datetime")? {
+            match py_datetime_to_param(obj_ref)? {
+                PyDateTimeParam::Timestamp(naive) => {
+                    has_ambiguous_temporal = true;
+                    query = query.bind(naive)
+                }
+                PyDateTimeParam::Timestamptz(utc) => {
+                    has_ambiguous_temporal = true;
+                    query = query.bind(utc)
+                }
+            }
+        } else if py_isinstance(py, obj_ref, &PY_DATE, "datetime", "date")? {
+            has_ambiguous_temporal = true;
+            let d = py_date_to_chrono(obj_ref)?;
+            query = query.bind(d)
+        } else if py_isinstance(py, obj_ref, &PY_TIME, "datetime", "time")? {
+            let t = py_time_to_chrono(obj_ref)?;
+            query = query.bind(t)
+        } else if py_isinstance(py, obj_ref, &PY_UUID, "uuid", "UUID")? {
+            // Parse from the string form - pyo3 has no FromPyObject for
+            // uuid::Uuid under this crate's feature set (and extracting via
+            // an assumed impl would simply not compile).
+            let u = Uuid::parse_str(&obj_ref.str()?.extract::<String>()?)
+                .map_err(|e| DataError::new_err(format!("invalid UUID parameter: {}", e)))?;
+            query = query.bind(u)
+        } else if py_isinstance(py, obj_ref, &PY_DECIMAL, "decimal", "Decimal")? {
+            let d = BigDecimal::from_str(&obj_ref.str()?.extract::<String>()?)
+                .map_err(|e| DataError::new_err(format!("invalid Decimal parameter: {}", e)))?;
+            query = query.bind(d)
+        } else if let Some(items) = list_or_tuple_items(obj_ref) {
+            // A homogeneous bool/int/float/str list/tuple binds as a real
+            // Postgres array; anything else (mixed types, nested
+            // containers) falls through to the same JSON conversion a
+            // dict gets, below - see py_sequence_to_array.
+            query = match py_sequence_to_array(&items)? {
+                Some(array) => bind_array(query, array),
+                None => query.bind(py_to_json(obj_ref)?),
+            }
+        } else if obj_ref.downcast::<PyDict>().is_ok()
+            || obj_ref.downcast::<PySet>().is_ok()
+            || obj_ref.downcast::<PyFrozenSet>().is_ok()
+        {
+            // set/frozenset route through py_to_json purely to hit its
+            // existing "not JSON-mappable" error arm with the right message
+            // - neither ever succeeds here, since py_to_json has no match
+            // arm for either. Without this, a bare set/frozenset parameter
+            // fell through to the str(obj) TEXT fallback below instead of
+            // raising - silently binding e.g. "{1, 2, 3}" as text, which
+            // then corrupts a prepared statement already cached with a
+            // JSONB-typed placeholder for the same SQL text (Postgres:
+            // "unsupported jsonb version number", not a catchable DataError).
+            let json = py_to_json(obj_ref)?;
+            query = query.bind(json)
+        } else if let Ok(b) = obj_ref.downcast::<PyBytes>() {
+            // Owned Vec (not the &[u8] borrow): the local borrow can't
+            // outlive 'q on the returned Query, and sqlx copies into the
+            // argument buffer either way.
+            query = query.bind(b.as_bytes().to_vec())
+        } else if let Ok(b) = obj_ref.downcast::<PyByteArray>() {
+            // to_vec() copies first - see the safety notes on as_bytes():
+            // holding the borrow across sqlx's async encode path could race
+            // a concurrent Python-side resize of the same bytearray.
+            query = query.bind(b.to_vec())
+        } else if py_isinstance(py, obj_ref, &PY_MEMORYVIEW, "builtins", "memoryview")? {
+            // memoryview sits next to bytes/bytearray in users' minds;
+            // letting it fall through to the TEXT fallback would silently
+            // bind the repr ("<memory at 0x...>") as the value. pyo3 0.20
+            // has no typed `PyMemoryView` wrapper, so go through the same
+            // isinstance + method-call route as datetime/uuid/decimal above:
+            // `tobytes()` is a real memoryview method, no buffer-protocol
+            // API (also abi3-restricted) needed.
+            let b = obj_ref.call_method0("tobytes")?;
+            query = query.bind(b.downcast::<PyBytes>()?.as_bytes().to_vec())
         } else {
             let s = obj_ref.str()?.extract::<String>()?;
             query = query.bind(s)
         };
     }
-    Ok(query.persistent(!has_null))
+    // Non-persistent whenever any parameter's wire type depends on runtime
+    // context the SQL text doesn't capture: an untyped NULL (OID 0), or any
+    // DATE/TIMESTAMP/TIMESTAMPTZ binding (see has_ambiguous_temporal above).
+    Ok(query.persistent(!(has_null || has_ambiguous_temporal)))
+}
+
+fn list_or_tuple_items(obj: &PyAny) -> Option<Vec<&PyAny>> {
+    if let Ok(l) = obj.downcast::<PyList>() {
+        Some(l.iter().collect())
+    } else if let Ok(t) = obj.downcast::<PyTuple>() {
+        Some(t.iter().collect())
+    } else {
+        None
+    }
+}
+
+/// A homogeneous Python list/tuple, ready to bind as a real Postgres array
+/// (`bool[]`/`int8[]`/`float8[]`/`text[]`) instead of falling back to the
+/// same JSON conversion a dict gets. `None` elements become SQL NULL entries
+/// in the array, matching how a bare `None` parameter already binds as SQL
+/// NULL.
+enum PyArrayParam {
+    Bool(Vec<Option<bool>>),
+    Int(Vec<Option<i64>>),
+    Float(Vec<Option<f64>>),
+    Text(Vec<Option<String>>),
+}
+
+/// Classify a Python list/tuple as a homogeneous primitive array, the same
+/// way a bare scalar is classified in `bind_params` above (bool before int,
+/// since `bool` is a subclass of `int` in Python). Returns `Ok(None)` - not
+/// an error - for anything that doesn't cleanly fit one primitive type
+/// (mixed element types, a nested list, a dict, ...), so the caller falls
+/// back to `py_to_json` for it instead of hard-failing here.
+///
+/// ponytail: an all-`None` list has no element type to infer, so it binds as
+/// `text[]` (Postgres's own default array elem type is also `text` for an
+/// untyped `ARRAY[NULL]` literal) - add an explicit-type escape hatch (cast
+/// in the SQL text) if a caller ever needs a typed all-NULL array.
+fn py_sequence_to_array(items: &[&PyAny]) -> PyResult<Option<PyArrayParam>> {
+    #[derive(PartialEq, Clone, Copy)]
+    enum Kind {
+        Bool,
+        Int,
+        Float,
+        Text,
+    }
+
+    let mut kind: Option<Kind> = None;
+    for item in items {
+        if item.is_none() {
+            continue;
+        }
+        let this_kind = if item.downcast::<PyBool>().is_ok() {
+            Kind::Bool
+        } else if item.downcast::<PyInt>().is_ok() {
+            Kind::Int
+        } else if item.downcast::<PyFloat>().is_ok() {
+            Kind::Float
+        } else if item.downcast::<PyString>().is_ok() {
+            Kind::Text
+        } else {
+            return Ok(None);
+        };
+        match kind {
+            None => kind = Some(this_kind),
+            Some(k) if k == this_kind => {}
+            Some(_) => return Ok(None),
+        }
+    }
+
+    Ok(Some(match kind {
+        None => PyArrayParam::Text(items.iter().map(|_| None).collect()),
+        Some(Kind::Bool) => PyArrayParam::Bool(extract_array(items, |i| i.extract::<bool>())?),
+        Some(Kind::Int) => PyArrayParam::Int(extract_array(items, |i| i.extract::<i64>())?),
+        Some(Kind::Float) => PyArrayParam::Float(extract_array(items, |i| i.extract::<f64>())?),
+        Some(Kind::Text) => PyArrayParam::Text(extract_array(items, |i| i.extract::<String>())?),
+    }))
+}
+
+fn extract_array<T>(
+    items: &[&PyAny],
+    extract: impl Fn(&PyAny) -> PyResult<T>,
+) -> PyResult<Vec<Option<T>>> {
+    items
+        .iter()
+        .map(|item| if item.is_none() { Ok(None) } else { extract(item).map(Some) })
+        .collect()
+}
+
+fn bind_array<'q>(
+    query: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
+    array: PyArrayParam,
+) -> sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments> {
+    match array {
+        PyArrayParam::Bool(v) => query.bind(v),
+        PyArrayParam::Int(v) => query.bind(v),
+        PyArrayParam::Float(v) => query.bind(v),
+        PyArrayParam::Text(v) => query.bind(v),
+    }
 }
 
 /// Decode one column of a type that has both sqlx's wire decode (`Decode`/`Type`)
@@ -139,6 +568,17 @@ fn decode_uuid(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject> {
     let value: Option<Uuid> = row.try_get(idx).map_err(map_db_error)?;
     Ok(value
         .map(|u| u.to_string().into_py(py))
+        .unwrap_or_else(|| py.None()))
+}
+
+/// BYTEA -> Python `bytes`. Not `decode_scalar::<Vec<u8>>` - pyo3's generic
+/// `IntoPy` for `Vec<u8>` produces a Python `list` of ints (each byte boxed
+/// as its own `int` object), not a `bytes` object; `PyBytes::new` is the
+/// actual `bytes` conversion.
+fn decode_bytea(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject> {
+    let value: Option<Vec<u8>> = row.try_get(idx).map_err(map_db_error)?;
+    Ok(value
+        .map(|b| pyo3::types::PyBytes::new(py, &b).into_py(py))
         .unwrap_or_else(|| py.None()))
 }
 
@@ -277,6 +717,16 @@ pub fn pg_value_to_py(py: Python, row: &PgRow, idx: usize) -> PyResult<PyObject>
         "FLOAT4" => decode_scalar::<f32>(py, row, idx),
         "FLOAT8" => decode_scalar::<f64>(py, row, idx),
         "TEXT" | "VARCHAR" | "CHAR" | "BPCHAR" | "NAME" => decode_scalar::<String>(py, row, idx),
+        "BYTEA" => decode_bytea(py, row, idx),
+        "BOOL[]" => decode_scalar::<Vec<Option<bool>>>(py, row, idx),
+        "INT2[]" => decode_scalar::<Vec<Option<i16>>>(py, row, idx),
+        "INT4[]" => decode_scalar::<Vec<Option<i32>>>(py, row, idx),
+        "INT8[]" => decode_scalar::<Vec<Option<i64>>>(py, row, idx),
+        "FLOAT4[]" => decode_scalar::<Vec<Option<f32>>>(py, row, idx),
+        "FLOAT8[]" => decode_scalar::<Vec<Option<f64>>>(py, row, idx),
+        "TEXT[]" | "VARCHAR[]" | "CHAR[]" | "BPCHAR[]" | "NAME[]" => {
+            decode_scalar::<Vec<Option<String>>>(py, row, idx)
+        }
         "NUMERIC" => decode_numeric(py, row, idx),
         "UUID" => decode_uuid(py, row, idx),
         "TIMESTAMP" => decode_timestamp(py, row, idx),
